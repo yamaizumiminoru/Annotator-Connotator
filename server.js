@@ -85,7 +85,7 @@ function parseJsonObject(text) {
   }
 }
 
-async function callOpenAI(input, maxOutputTokens) {
+async function callOpenAI(input, maxOutputTokens, options = {}) {
   const body = {
     model,
     input,
@@ -95,6 +95,13 @@ async function callOpenAI(input, maxOutputTokens) {
   if (model.startsWith("gpt-5")) {
     body.reasoning = { effort: reasoningEffort };
     body.text = { verbosity: textVerbosity };
+  }
+
+  if (options.jsonObject) {
+    body.text = {
+      ...(body.text || {}),
+      format: { type: "json_object" },
+    };
   }
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -115,6 +122,32 @@ async function callOpenAI(input, maxOutputTokens) {
   }
 
   return response.json();
+}
+
+async function parseOrRepairJson(rawText, contextLabel) {
+  try {
+    return parseJsonObject(rawText);
+  } catch (firstError) {
+    const repairPrompt = [
+      "Repair this into one valid JSON object.",
+      "Return only JSON. Do not use markdown fences.",
+      "Preserve the original schema and all usable content.",
+      "If an array or string is truncated, close it cleanly and keep the valid preceding items.",
+      `Context: ${contextLabel}`,
+    ].join("\n");
+
+    try {
+      const repaired = await callOpenAI([
+        { role: "system", content: repairPrompt },
+        { role: "user", content: rawText.slice(0, 20000) },
+      ], 6000, { jsonObject: true });
+      return parseJsonObject(extractText(repaired));
+    } catch (repairError) {
+      const error = new Error(`The model returned malformed JSON and automatic repair failed: ${firstError.message}`);
+      error.cause = repairError;
+      throw error;
+    }
+  }
 }
 
 function levelPrompt(level) {
@@ -310,9 +343,9 @@ async function handleAnnotate(req, res) {
           explanationLanguage: payload.explanationLanguage || "ja",
         }, null, 2),
       },
-    ], 3600);
+    ], 9000, { jsonObject: true });
 
-    const parsed = parseJsonObject(extractText(data));
+    const parsed = await parseOrRepairJson(extractText(data), "annotation result");
     parsed.sourceText = parsed.sourceText || text;
     parsed.sourceLanguage = parsed.sourceLanguage || payload.sourceLanguage || "auto";
     parsed.explanationLanguage = parsed.explanationLanguage || payload.explanationLanguage || "ja";
@@ -369,8 +402,8 @@ async function handleUiTranslations(req, res) {
     const data = await callOpenAI([
       { role: "system", content: system },
       { role: "user", content: JSON.stringify({ strings }, null, 2) },
-    ], 2200);
-    const parsed = parseJsonObject(extractText(data));
+    ], 3600, { jsonObject: true });
+    const parsed = await parseOrRepairJson(extractText(data), "ui translation result");
     const translated = parsed.strings && typeof parsed.strings === "object" ? parsed.strings : parsed;
     sendJson(res, 200, { language, strings: translated });
   } catch (error) {
