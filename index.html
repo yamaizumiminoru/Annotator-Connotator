@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Language Annotation Studio</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="workspace" aria-label="Language annotation workspace">
+      <aside class="input-pane">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow" data-i18n="appName">Language Annotation Studio</p>
+            <h1 data-i18n="appTitle">多言語アノテーション</h1>
+          </div>
+          <div class="server-pill" id="serverPill">local</div>
+        </div>
+
+        <label class="field-label" for="sourceText" data-i18n="inputText">入力文</label>
+        <textarea id="sourceText" spellcheck="false"></textarea>
+
+        <div class="language-grid">
+          <label class="select-field" for="sourceLangSelect">
+            <span data-i18n="sourceLanguage">入力言語</span>
+            <select id="sourceLangSelect"></select>
+          </label>
+
+          <label class="select-field" for="explanationLangSelect">
+            <span data-i18n="explanationLanguage">解説言語</span>
+            <select id="explanationLangSelect"></select>
+          </label>
+
+          <label class="select-field" for="uiLangSelect">
+            <span data-i18n="uiLanguage">UI</span>
+            <select id="uiLangSelect"></select>
+          </label>
+        </div>
+
+        <div class="control-group">
+          <div class="field-label" data-i18n="difficulty">難易度</div>
+          <div class="segmented" role="group" aria-label="Target difficulty">
+            <button class="segment" data-level="beginner" data-i18n="beginner" type="button">基礎</button>
+            <button class="segment active" data-level="intermediate" data-i18n="intermediate" type="button">中級</button>
+            <button class="segment" data-level="advanced" data-i18n="advanced" type="button">上級</button>
+            <button class="segment" data-level="academic" data-i18n="academic" type="button">学術</button>
+          </div>
+        </div>
+
+        <div class="control-grid">
+          <label class="slider-field" for="densityRange">
+            <span data-i18n="density">抽出量</span>
+            <strong id="densityLabel">標準</strong>
+            <input id="densityRange" type="range" min="1" max="3" step="1" value="2">
+          </label>
+
+          <label class="select-field" for="focusSelect">
+            <span data-i18n="focus">観点</span>
+            <select id="focusSelect">
+              <option value="balanced" data-i18n="balanced">バランス</option>
+              <option value="speaking" data-i18n="speaking">会話で使う</option>
+              <option value="academic" data-i18n="academicFocus">論文・発表</option>
+              <option value="grammar" data-i18n="grammarFocus">構文</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="toggle-grid">
+          <label><input id="includeGrammar" type="checkbox" checked> <span data-i18n="includeGrammar">構文も拾う</span></label>
+          <label><input id="includeSlash" type="checkbox" checked> <span data-i18n="includeSlash">スラッシュ読み</span></label>
+        </div>
+
+        <div class="action-row">
+          <button class="primary-btn" id="annotateBtn" type="button">
+            <span class="btn-icon">A</span>
+            <span data-i18n="analyze">解析</span>
+          </button>
+          <button class="ghost-btn" id="sampleBtn" data-i18n="sample" type="button">例文</button>
+          <button class="ghost-btn" id="clearBtn" data-i18n="clear" type="button">消去</button>
+        </div>
+
+        <div class="status" id="statusBox" role="status"></div>
+      </aside>
+
+      <section class="result-pane">
+        <div class="top-bar">
+          <div class="tab-row" role="tablist">
+            <button class="tab active" data-tab="annotated" data-i18n="textTab" type="button">本文</button>
+            <button class="tab" data-tab="words" data-i18n="wordsTab" type="button">語句</button>
+            <button class="tab" data-tab="slash" data-i18n="readingTab" type="button">読解</button>
+            <button class="tab" data-tab="export" data-i18n="exportTab" type="button">出力</button>
+          </div>
+          <button class="icon-btn" id="speakBtn" type="button" aria-label="音声再生" title="音声再生" data-i18n-aria="speak" data-i18n-title="speak">▶</button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat">
+            <span id="statVocab">0</span>
+            <small data-i18n="vocab">語彙</small>
+          </div>
+          <div class="stat">
+            <span id="statPhrase">0</span>
+            <small data-i18n="expression">表現</small>
+          </div>
+          <div class="stat">
+            <span id="statGrammar">0</span>
+            <small data-i18n="grammar">構文</small>
+          </div>
+          <div class="stat">
+            <span id="statLevel">中級</span>
+            <small data-i18n="setting">設定</small>
+          </div>
+        </div>
+
+        <div class="legend" aria-label="Annotation legend">
+          <span><i class="dot vocab"></i><span data-i18n="vocab">語彙</span></span>
+          <span><i class="dot phrase"></i><span data-i18n="expression">表現</span></span>
+          <span><i class="dot idiom"></i><span data-i18n="idiom">イディオム</span></span>
+          <span><i class="dot grammar"></i><span data-i18n="grammar">構文</span></span>
+        </div>
+
+        <section class="panel active" id="panel-annotated">
+          <article class="script-card">
+            <div class="script-text" id="annotatedText"></div>
+          </article>
+          <article class="translation-card">
+            <h2 data-i18n="translationTitle">解説言語での翻訳</h2>
+            <p id="translationText"></p>
+          </article>
+        </section>
+
+        <section class="panel" id="panel-words">
+          <div class="wordlist" id="wordList"></div>
+        </section>
+
+        <section class="panel" id="panel-slash">
+          <article class="script-card">
+            <div class="slash-text" id="slashText"></div>
+          </article>
+        </section>
+
+        <section class="panel" id="panel-export">
+          <div class="export-grid">
+            <button class="ghost-btn" id="copyJsonBtn" data-i18n="json" type="button">JSON</button>
+            <button class="ghost-btn" id="copyMarkdownBtn" data-i18n="markdown" type="button">Markdown</button>
+          </div>
+          <textarea id="exportText" readonly spellcheck="false"></textarea>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <div class="popup-overlay" id="overlay">
+    <article class="popup" role="dialog" aria-modal="true" aria-labelledby="popupWord">
+      <button class="popup-close" id="popupClose" type="button" aria-label="閉じる" data-i18n-aria="close">×</button>
+      <p class="popup-word" id="popupWord"></p>
+      <span class="popup-type" id="popupType"></span>
+      <p class="popup-def" id="popupDef"></p>
+      <p class="popup-note" id="popupNote"></p>
+      <p class="popup-ex" id="popupExample"></p>
+    </article>
+  </div>
+
+  <script src="./languages.js"></script>
+  <script src="./script.js"></script>
+</body>
+</html>
