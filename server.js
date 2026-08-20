@@ -7,7 +7,7 @@ const root = __dirname;
 loadDotEnv(path.join(root, ".env"));
 
 const port = Number(process.env.PORT || 4174);
-const model = process.env.OPENAI_MODEL || "gpt-5.5";
+const model = process.env.OPENAI_MODEL || "gpt-5.6-sol";
 const reasoningEffort = process.env.OPENAI_REASONING_EFFORT || "low";
 const textVerbosity = process.env.OPENAI_TEXT_VERBOSITY || "low";
 

@@ -1,4 +1,6 @@
-const sampleText = `In a recent conversation, we discussed how the cost of being perceived as "normal" may differ by gender. In Japan, for example, an adult woman might be judged if she does not wear makeup or dye her gray hair, while a man in the same casual state is often still seen as acceptable. This subtle difference shows an unconscious bias that is not formalized but affects people's everyday choices. While I am no expert in feminism, I believe this could be a topic worth exploring further to create more awareness.`;
+const sampleText = `大学に入ったら、専門性・個性・学識を身に付けたい！ そんなあなたには、外国語学部で外国語を学ぶのに加えて、私みたいに日本語を研究することをオススメします！
+研究とは、人類の知を広げる活動です。既に誰かが明らかにしたことを学ぶのは、勉強（自分の知を広げること）であって、研究ではありません。まだ誰も明らかにしていないことを明らかにする――これほど明確な専門性と個性があるでしょうか。もちろん、人類の最先端に行くには、それまで明らかになっていることを勉強する必要があり、研究できるほどの知識は立派な学識と言えます。つまり、研究をすれば、専門性も個性も学識も自然に身に付くということです。人類にも貢献できます。
+何を研究すればいいかって？ 外国語学部で学ぶ外国語でもいいですが、その言語が相当できるようになる必要があります。それを待っていられなかったら、まずは長年学んできた日本語を研究しましょう。街中で、そして、あなたの頭の中でも、日本語はあなたに解明されるのを待っています。`;
 
 const languageCatalog = window.LANGUAGE_CATALOG || [];
 const baseUiText = window.UI_TEXT || {};
@@ -565,7 +567,7 @@ function emptyCard(text) {
 
 function loadSample() {
   els.sourceText.value = sampleText;
-  els.sourceLangSelect.value = "en";
+  els.sourceLangSelect.value = "ja";
   persistSettings();
   setStatus(t("sampleLoaded"), "ok");
 }
@@ -619,6 +621,29 @@ function speechLanguage(code) {
   return language?.speech || "en-US";
 }
 
+function resolvedSpeechLanguage() {
+  const selected = els.sourceLangSelect.value;
+  if (selected && selected !== "auto") return speechLanguage(selected);
+  const detected = state.result?.sourceLanguage;
+  if (detected && detected !== "auto") return speechLanguage(detected);
+  return inferSpeechLanguage(els.sourceText.value);
+}
+
+function inferSpeechLanguage(text) {
+  if (/[\u3040-\u30ff]/.test(text)) return speechLanguage("ja");
+  if (/[\uac00-\ud7af]/.test(text)) return speechLanguage("ko");
+  if (/[\u4e00-\u9fff]/.test(text)) return speechLanguage("zh");
+  return speechLanguage("en");
+}
+
+function matchingVoice(lang) {
+  const voices = window.speechSynthesis?.getVoices?.() || [];
+  const base = lang.split("-")[0];
+  return voices.find((voice) => voice.lang === lang)
+    || voices.find((voice) => voice.lang?.startsWith(`${base}-`))
+    || null;
+}
+
 function toggleSpeech() {
   if (!window.speechSynthesis) {
     setStatus(t("speechUnsupported"), "error");
@@ -633,7 +658,9 @@ function toggleSpeech() {
   const text = els.sourceText.value.trim();
   if (!text) return;
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = speechLanguage(els.sourceLangSelect.value);
+  utterance.lang = resolvedSpeechLanguage();
+  const voice = matchingVoice(utterance.lang);
+  if (voice) utterance.voice = voice;
   utterance.rate = 0.86;
   utterance.onend = () => {
     state.speaking = false;

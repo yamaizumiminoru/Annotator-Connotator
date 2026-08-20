@@ -1,7 +1,7 @@
 # Language Annotation Studio
 
 Local app server for turning pasted text into a clickable language-learning dashboard.
-The default model is `gpt-5.5`.
+The default model is `gpt-5.6-sol`.
 
 ## Setup
 
