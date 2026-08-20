@@ -467,6 +467,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`Language Annotation Studio: http://localhost:${port}`);
+  console.log(`Annotator-Connotator: http://localhost:${port}`);
   console.log(process.env.OPENAI_API_KEY ? `LLM enabled with ${model}` : "OPENAI_API_KEY is not set.");
 });

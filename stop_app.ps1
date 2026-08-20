@@ -18,7 +18,7 @@ if (-not ($rawPid -match "^\d+$")) {
 $process = Get-Process -Id ([int]$rawPid) -ErrorAction SilentlyContinue
 if ($process) {
   Stop-Process -Id $process.Id
-  Write-Host "Stopped Language Annotation Studio server."
+  Write-Host "Stopped Annotator-Connotator server."
 } else {
   Write-Host "Server process was not running."
 }

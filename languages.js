@@ -60,8 +60,8 @@ window.LANGUAGE_CATALOG = [
 
 window.UI_TEXT = {
   ja: {
-    documentTitle: "Language Annotation Studio",
-    appName: "Language Annotation Studio",
+    documentTitle: "Annotator-Connotator",
+    appName: "Annotator-Connotator",
     appTitle: "多言語アノテーション",
     inputText: "入力文",
     sourceLanguage: "入力言語",
@@ -126,8 +126,8 @@ window.UI_TEXT = {
     uiLanguageExport: "UI言語",
   },
   en: {
-    documentTitle: "Language Annotation Studio",
-    appName: "Language Annotation Studio",
+    documentTitle: "Annotator-Connotator",
+    appName: "Annotator-Connotator",
     appTitle: "Multilingual Annotation",
     inputText: "Input text",
     sourceLanguage: "Input language",

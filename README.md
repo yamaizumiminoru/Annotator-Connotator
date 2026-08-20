@@ -1,7 +1,11 @@
-# Language Annotation Studio
+# Annotator-Connotator
 
-Local app server for turning pasted text into a clickable language-learning dashboard.
+Turn any text into language-learning material with annotations, translations, and connotation-aware explanations.
 The default model is `gpt-5.6-sol`.
+
+## Name
+
+**Annotator-Connotator** combines the idea of turning a document into teaching material in every useful way with support for understanding not only annotation, but also connotation.
 
 ## Setup
 

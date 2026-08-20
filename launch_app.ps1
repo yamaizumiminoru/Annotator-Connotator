@@ -63,13 +63,13 @@ $appUrl = "http://localhost:$port"
 $pidPath = Join-Path $AppDir "server.pid"
 
 if (Test-AppHealth $healthUrl) {
-  Write-Host "Language Annotation Studio is already running: $appUrl"
+  Write-Host "Annotator-Connotator is already running: $appUrl"
 } else {
   $node = Get-NodePath
   $outLog = Join-Path $AppDir "server.out.log"
   $errLog = Join-Path $AppDir "server.err.log"
 
-  Write-Host "Starting Language Annotation Studio..."
+  Write-Host "Starting Annotator-Connotator..."
   $process = Start-Process `
     -FilePath $node `
     -ArgumentList "server.js" `
