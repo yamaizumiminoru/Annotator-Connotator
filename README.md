@@ -2,6 +2,7 @@
 
 Turn any text into language-learning material with annotations, translations, and connotation-aware explanations.
 The default model is `gpt-5.6-sol`.
+The app provides 73 selectable languages for source text, explanations, and the interface.
 
 ## Name
 
@@ -38,6 +39,7 @@ variable on the host.
 ## What It Does
 
 - Lets you paste text in a selected source language.
+- Supports 73 selectable languages, with automatic source-language detection.
 - Lets you choose the explanation language separately.
 - Lets you choose a UI language.
 - Shows a full translation in the selected explanation language.
@@ -46,6 +48,10 @@ variable on the host.
 - Sends the passage to the local server endpoint `POST /api/annotate`.
 - Keeps the API key on the server side.
 - Renders clickable vocabulary, phrases, idioms, grammar notes, slash reading, and exportable JSON/Markdown.
+
+## Language Quality Evaluation
+
+The 16 languages added in v0.3.0 passed two GPT-5.6 source-language evaluation cases each, followed by a separate explanation-language test. The tests covered translation fidelity, annotation accuracy, learning usefulness, connotation/register handling, output-language naturalness, and renderable source spans. See `docs/LANGUAGE_EVALUATION_2026-08-21.md` for the results and `scripts/evaluate_candidate_languages.mjs` for the reproducible evaluator.
 
 ## Credit
 

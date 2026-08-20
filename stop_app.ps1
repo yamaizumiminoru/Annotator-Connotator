@@ -8,7 +8,8 @@ if (-not (Test-Path -LiteralPath $pidPath)) {
   exit 0
 }
 
-$rawPid = (Get-Content -LiteralPath $pidPath -Raw).Trim()
+$pidContent = Get-Content -LiteralPath $pidPath -Raw -ErrorAction SilentlyContinue
+$rawPid = if ($null -eq $pidContent) { "" } else { $pidContent.Trim() }
 if (-not ($rawPid -match "^\d+$")) {
   Remove-Item -LiteralPath $pidPath -Force
   Write-Host "Removed invalid server.pid."

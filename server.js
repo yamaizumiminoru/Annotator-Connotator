@@ -180,12 +180,16 @@ function languageName(code, fallback = "Japanese") {
   const table = {
     auto: "auto-detected source language",
     af: "Afrikaans",
+    am: "Amharic",
     ar: "Arabic",
     hy: "Armenian",
     az: "Azerbaijani",
+    eu: "Basque",
     be: "Belarusian",
+    bn: "Bengali",
     bs: "Bosnian",
     bg: "Bulgarian",
+    my: "Burmese",
     ca: "Catalan",
     zh: "Chinese",
     hr: "Croatian",
@@ -197,8 +201,11 @@ function languageName(code, fallback = "Japanese") {
     fi: "Finnish",
     fr: "French",
     gl: "Galician",
+    ka: "Georgian",
     de: "German",
     el: "Greek",
+    gu: "Gujarati",
+    ha: "Hausa",
     he: "Hebrew",
     hi: "Hindi",
     hu: "Hungarian",
@@ -208,11 +215,15 @@ function languageName(code, fallback = "Japanese") {
     ja: "Japanese",
     kn: "Kannada",
     kk: "Kazakh",
+    km: "Khmer",
     ko: "Korean",
+    lo: "Lao",
     lv: "Latvian",
     lt: "Lithuanian",
     mk: "Macedonian",
     ms: "Malay",
+    ml: "Malayalam",
+    mt: "Maltese",
     mi: "Maori",
     mr: "Marathi",
     ne: "Nepali",
@@ -220,6 +231,7 @@ function languageName(code, fallback = "Japanese") {
     fa: "Persian",
     pl: "Polish",
     pt: "Portuguese",
+    pa: "Punjabi",
     ro: "Romanian",
     ru: "Russian",
     sr: "Serbian",
@@ -230,12 +242,16 @@ function languageName(code, fallback = "Japanese") {
     sv: "Swedish",
     tl: "Tagalog",
     ta: "Tamil",
+    te: "Telugu",
     th: "Thai",
     tr: "Turkish",
     uk: "Ukrainian",
     ur: "Urdu",
+    uz: "Uzbek",
     vi: "Vietnamese",
     cy: "Welsh",
+    yo: "Yoruba",
+    zu: "Zulu",
   };
   return table[code] || fallback;
 }
@@ -347,6 +363,7 @@ async function handleAnnotate(req, res) {
 
     const parsed = await parseOrRepairJson(extractText(data), "annotation result");
     parsed.sourceText = parsed.sourceText || text;
+    parsed.annotations = repairAnnotationOffsets(parsed.sourceText, parsed.annotations);
     parsed.sourceLanguage = parsed.sourceLanguage || payload.sourceLanguage || "auto";
     parsed.explanationLanguage = parsed.explanationLanguage || payload.explanationLanguage || "ja";
     parsed.translation = parsed.translation || "";
@@ -359,6 +376,35 @@ async function handleAnnotate(req, res) {
       detail: error.detail,
     });
   }
+}
+
+function repairAnnotationOffsets(sourceText, annotations) {
+  if (!Array.isArray(annotations)) return [];
+  const occupied = [];
+
+  return annotations.map((item) => {
+    const annotationText = String(item?.text || "");
+    if (!annotationText) return item;
+
+    const candidates = [];
+    if (Number.isInteger(item.start) && Number.isInteger(item.end)) {
+      candidates.push([item.start, item.end]);
+    }
+    let index = sourceText.indexOf(annotationText);
+    while (index >= 0) {
+      candidates.push([index, index + annotationText.length]);
+      index = sourceText.indexOf(annotationText, index + 1);
+    }
+
+    for (const [start, end] of candidates) {
+      if (start < 0 || end <= start || end > sourceText.length) continue;
+      if (sourceText.slice(start, end) !== annotationText) continue;
+      if (occupied.some((range) => start < range.end && end > range.start)) continue;
+      occupied.push({ start, end });
+      return { ...item, start, end };
+    }
+    return item;
+  });
 }
 
 async function handleUiTranslations(req, res) {

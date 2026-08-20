@@ -1,5 +1,5 @@
 param(
-  [string]$Model = $(if ($env:OPENAI_MODEL) { $env:OPENAI_MODEL } else { "gpt-5.5" }),
+  [string]$Model = $(if ($env:OPENAI_MODEL) { $env:OPENAI_MODEL } else { "gpt-5.6-sol" }),
   [int]$Port = 4174
 )
 

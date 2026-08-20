@@ -1,4 +1,5 @@
 .env
 *.log
 server.pid
+language-evaluation-*.json
 node_modules/
