@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import vm from "node:vm";
 
 const root = path.resolve(import.meta.dirname, "..");
 loadDotEnv(path.join(root, ".env"));
@@ -10,6 +11,7 @@ const model = process.env.LANGUAGE_EVAL_MODEL || process.env.OPENAI_MODEL || "gp
 const args = process.argv.slice(2);
 const rejudge = args.includes("--rejudge");
 const evaluateExplanations = args.includes("--explanations");
+const legacyMode = args.includes("--legacy");
 const requestedOutput = args.find((arg) => !arg.startsWith("--"));
 const outputPath = path.resolve(
   root,
@@ -39,6 +41,39 @@ const candidates = [
   { code: "yo", name: "Yoruba", native: "Yorùbá", speech: "yo-NG" },
   { code: "zu", name: "Zulu", native: "isiZulu", speech: "zu-ZA" },
 ];
+
+const evaluatedAdditionCodes = new Set([
+  "am", "bn", "my", "eu", "ka", "gu", "ha", "km",
+  "lo", "ml", "mt", "pa", "te", "uz", "yo", "zu",
+]);
+const currentCatalog = loadCurrentCatalog();
+const withdrawnLegacyLanguages = [
+  { code: "mi", name: "Maori", native: "Māori", speech: "mi-NZ" },
+  { code: "ur", name: "Urdu", native: "اردو", speech: "ur-PK" },
+];
+const legacyLanguageCodes = [
+  "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi",
+  "fr", "gl", "de", "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt",
+  "mk", "ms", "mi", "mr", "ne", "no", "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw",
+  "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy",
+];
+const legacyMetadata = new Map([
+  ...currentCatalog.filter((language) => !evaluatedAdditionCodes.has(language.code)),
+  ...withdrawnLegacyLanguages,
+].map((language) => [language.code, language]));
+const legacyLanguages = legacyLanguageCodes.map((code) => legacyMetadata.get(code));
+const targetLanguages = legacyMode ? legacyLanguages : candidates;
+
+if (legacyMode && (legacyLanguages.length !== 57 || legacyLanguages.some((language) => !language))) {
+  throw new Error("Could not reconstruct the original 57-language catalog.");
+}
+
+function loadCurrentCatalog() {
+  const source = fs.readFileSync(path.join(root, "languages.js"), "utf8");
+  const match = source.match(/window\.LANGUAGE_CATALOG\s*=\s*(\[[\s\S]*?\n\]);/);
+  if (!match) throw new Error("Could not read LANGUAGE_CATALOG from languages.js.");
+  return vm.runInNewContext(match[1]);
+}
 
 function loadDotEnv(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -104,12 +139,10 @@ async function callOpenAI(input, maxOutputTokens = 12000) {
 }
 
 async function generateCases() {
+  let savedCases = [];
   if (fs.existsSync(casesPath)) {
     const saved = JSON.parse(fs.readFileSync(casesPath, "utf8"));
-    if (Array.isArray(saved.cases) && saved.cases.length === candidates.length * 2) {
-      console.log(`Reusing ${casesPath}`);
-      return saved.cases;
-    }
+    if (Array.isArray(saved.cases)) savedCases = saved.cases;
   }
 
   const system = [
@@ -123,16 +156,44 @@ async function generateCases() {
     "Provide a faithful English referenceTranslation and briefly name the targetFeature in English.",
     "Schema: {cases:[{id,code,name,kind,sourceText,referenceTranslation,targetFeature}]}",
   ].join("\n");
-  const result = await callOpenAI([
-    { role: "system", content: system },
-    { role: "user", content: JSON.stringify(candidates) },
-  ], 18000);
-  if (!Array.isArray(result.cases) || result.cases.length !== candidates.length * 2) {
-    throw new Error(`Expected ${candidates.length * 2} generated cases, received ${result.cases?.length || 0}.`);
+  const completeCodes = new Set(targetLanguages
+    .filter((language) => {
+      const cases = savedCases.filter((testCase) => testCase.code === language.code);
+      return cases.length === 2 && new Set(cases.map((testCase) => testCase.kind)).size === 2;
+    })
+    .map((language) => language.code));
+  const missing = targetLanguages.filter((language) => !completeCodes.has(language.code));
+
+  if (completeCodes.size) console.log(`Reusing ${completeCodes.size} languages from ${casesPath}`);
+
+  const generationBatchSize = 8;
+  for (let index = 0; index < missing.length; index += generationBatchSize) {
+    const batch = missing.slice(index, index + generationBatchSize);
+    console.log(`Generating cases for ${batch.map((language) => language.name).join(", ")}.`);
+    const result = await withRetry(
+      `Case generation batch ${index + 1}-${index + batch.length}`,
+      () => callOpenAI([
+        { role: "system", content: system },
+        { role: "user", content: JSON.stringify(batch) },
+      ], 14000),
+    );
+    if (!Array.isArray(result.cases) || result.cases.length !== batch.length * 2) {
+      throw new Error(`Expected ${batch.length * 2} generated cases, received ${result.cases?.length || 0}.`);
+    }
+    const batchCodes = new Set(batch.map((language) => language.code));
+    savedCases = savedCases.filter((testCase) => !batchCodes.has(testCase.code));
+    savedCases.push(...result.cases);
+    fs.writeFileSync(casesPath, `${JSON.stringify({ model, mode: legacyMode ? "legacy" : "candidate", cases: savedCases }, null, 2)}\n`, "utf8");
   }
-  fs.writeFileSync(casesPath, `${JSON.stringify({ model, cases: result.cases }, null, 2)}\n`, "utf8");
-  console.log(`Saved ${casesPath}`);
-  return result.cases;
+
+  const orderedCases = targetLanguages.flatMap((language) => savedCases
+    .filter((testCase) => testCase.code === language.code)
+    .sort((a, b) => String(a.kind).localeCompare(String(b.kind))));
+  if (orderedCases.length !== targetLanguages.length * 2) {
+    throw new Error(`Expected ${targetLanguages.length * 2} total cases, found ${orderedCases.length}.`);
+  }
+  console.log(`Prepared ${orderedCases.length} cases in ${casesPath}`);
+  return orderedCases;
 }
 
 async function withRetry(label, action, attempts = 3) {
@@ -384,7 +445,7 @@ async function runExplanationEvaluation() {
 }
 
 function calculateLanguageResults(records) {
-  return candidates.map((candidate) => {
+  return targetLanguages.map((candidate) => {
     const cases = records.filter((record) => record.testCase.code === candidate.code);
     const pass = cases.length === 2 && cases.every((record) => record.structure.pass && record.judgment.pass);
     const averageScore = cases.length
@@ -407,7 +468,7 @@ function calculateLanguageResults(records) {
 async function main() {
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is missing from .env.");
 
-  console.log(`Evaluating ${candidates.length} candidate languages with ${model}.`);
+  console.log(`Evaluating ${targetLanguages.length} ${legacyMode ? "legacy" : "candidate"} languages with ${model}.`);
   if (evaluateExplanations) {
     await runExplanationEvaluation();
     return;
@@ -459,6 +520,7 @@ async function main() {
     generatedAt: new Date().toISOString(),
     model,
     appUrl,
+    mode: legacyMode ? "legacy" : "candidate",
     criteria: "Both informational and pragmatic cases must pass structural checks and the AI quality threshold.",
     summary: {
       candidates: languages.length,

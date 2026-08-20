@@ -2,4 +2,5 @@
 *.log
 server.pid
 language-evaluation-*.json
+legacy-language-evaluation-*.json
 node_modules/
