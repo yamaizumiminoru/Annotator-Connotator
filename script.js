@@ -4,14 +4,18 @@ const sampleText = `大学に入ったら、専門性・個性・学識を身に
 
 const languageCatalog = window.LANGUAGE_CATALOG || [];
 const baseUiText = window.UI_TEXT || {};
+const uiTextCacheVersion = "4";
 
 const state = {
   level: "intermediate",
   result: null,
   annotationsById: new Map(),
+  connotationsById: new Map(),
+  connotationsByAnnotationId: new Map(),
   speaking: false,
   uiLanguage: "ja",
   uiText: baseUiText.ja || {},
+  inputMode: "text",
 };
 
 const typeTextKeys = {
@@ -25,7 +29,6 @@ const levelTextKeys = {
   beginner: "beginner",
   intermediate: "intermediate",
   advanced: "advanced",
-  academic: "academic",
 };
 
 const densityTextKeys = {
@@ -34,13 +37,37 @@ const densityTextKeys = {
   3: "densityHigh",
 };
 
+const nuanceTextKeys = {
+  1: "nuanceLow",
+  2: "nuanceStandard",
+  3: "nuanceHigh",
+};
+
+const connotationCategoryValues = [
+  "evaluative",
+  "stance",
+  "politeness",
+  "implicature",
+  "presupposition",
+  "register",
+  "irony",
+  "euphemism",
+];
+
 const els = {
   sourceText: document.getElementById("sourceText"),
+  youtubeImportPanel: document.getElementById("youtubeImportPanel"),
+  youtubeUrl: document.getElementById("youtubeUrl"),
+  youtubeImportBtn: document.getElementById("youtubeImportBtn"),
+  youtubeCorrect: document.getElementById("youtubeCorrect"),
+  youtubeMeta: document.getElementById("youtubeMeta"),
   sourceLangSelect: document.getElementById("sourceLangSelect"),
   explanationLangSelect: document.getElementById("explanationLangSelect"),
   uiLangSelect: document.getElementById("uiLangSelect"),
   densityRange: document.getElementById("densityRange"),
   densityLabel: document.getElementById("densityLabel"),
+  nuanceRange: document.getElementById("nuanceRange"),
+  nuanceLabel: document.getElementById("nuanceLabel"),
   focusSelect: document.getElementById("focusSelect"),
   includeGrammar: document.getElementById("includeGrammar"),
   includeSlash: document.getElementById("includeSlash"),
@@ -49,6 +76,9 @@ const els = {
   clearBtn: document.getElementById("clearBtn"),
   statusBox: document.getElementById("statusBox"),
   annotatedText: document.getElementById("annotatedText"),
+  inlineNuancePanel: document.getElementById("inlineNuancePanel"),
+  inlineNuanceCount: document.getElementById("inlineNuanceCount"),
+  inlineNuanceList: document.getElementById("inlineNuanceList"),
   translationText: document.getElementById("translationText"),
   wordList: document.getElementById("wordList"),
   slashText: document.getElementById("slashText"),
@@ -60,6 +90,7 @@ const els = {
   statVocab: document.getElementById("statVocab"),
   statPhrase: document.getElementById("statPhrase"),
   statGrammar: document.getElementById("statGrammar"),
+  statNuance: document.getElementById("statNuance"),
   statLevel: document.getElementById("statLevel"),
   overlay: document.getElementById("overlay"),
   popupClose: document.getElementById("popupClose"),
@@ -68,23 +99,29 @@ const els = {
   popupDef: document.getElementById("popupDef"),
   popupNote: document.getElementById("popupNote"),
   popupExample: document.getElementById("popupExample"),
+  popupNuances: document.getElementById("popupNuances"),
 };
 
 function init() {
   populateLanguageSelects();
 
   els.sourceText.value = localStorage.getItem("annotation.sourceText") || sampleText;
-  state.level = localStorage.getItem("annotation.level") || "intermediate";
+  els.youtubeUrl.value = localStorage.getItem("annotation.youtubeUrl") || "";
+  els.youtubeCorrect.checked = localStorage.getItem("annotation.youtubeCorrect") !== "false";
+  const savedLevel = localStorage.getItem("annotation.level") || "intermediate";
+  state.level = savedLevel === "academic" ? "advanced" : savedLevel;
 
   const savedDensity = localStorage.getItem("annotation.density");
   if (savedDensity) els.densityRange.value = savedDensity;
+  const savedNuanceDetail = localStorage.getItem("annotation.nuanceDetail");
+  if (savedNuanceDetail) els.nuanceRange.value = savedNuanceDetail;
 
   setSelectValue(els.sourceLangSelect, localStorage.getItem("annotation.sourceLanguage") || "auto");
   setSelectValue(els.explanationLangSelect, localStorage.getItem("annotation.explanationLanguage") || "ja");
   setSelectValue(els.uiLangSelect, localStorage.getItem("annotation.uiLanguage") || "ja");
 
   const savedFocus = localStorage.getItem("annotation.focus");
-  if (savedFocus) els.focusSelect.value = savedFocus;
+  els.focusSelect.value = ["balanced", "grammar"].includes(savedFocus) ? "all" : (savedFocus || "all");
   els.includeGrammar.checked = localStorage.getItem("annotation.includeGrammar") !== "false";
   els.includeSlash.checked = localStorage.getItem("annotation.includeSlash") !== "false";
 
@@ -97,8 +134,19 @@ function init() {
     button.addEventListener("click", () => showTab(button.dataset.tab));
   });
 
+  document.querySelectorAll(".input-mode-tab").forEach((button) => {
+    button.addEventListener("click", () => setInputMode(button.dataset.inputMode));
+  });
+
   els.densityRange.addEventListener("input", updateDensityLabel);
+  els.nuanceRange.addEventListener("input", updateNuanceLabel);
   els.sourceText.addEventListener("input", persistSettings);
+  els.youtubeUrl.addEventListener("input", persistSettings);
+  els.youtubeCorrect.addEventListener("change", persistSettings);
+  els.youtubeImportBtn.addEventListener("click", importYouTubeTranscript);
+  els.youtubeUrl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") importYouTubeTranscript();
+  });
   els.sourceLangSelect.addEventListener("change", persistSettings);
   els.explanationLangSelect.addEventListener("change", persistSettings);
   els.uiLangSelect.addEventListener("change", () => applyUiLanguage(els.uiLangSelect.value));
@@ -120,6 +168,7 @@ function init() {
   });
 
   applyUiLanguage(els.uiLangSelect.value, { silent: true });
+  setInputMode(localStorage.getItem("annotation.inputMode") || "text", false);
   renderEmpty();
   checkHealth();
 }
@@ -193,7 +242,7 @@ async function applyUiLanguage(languageCode, options = {}) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.strings) throw new Error(data.message || "translation failed");
     state.uiText = { ...baseUiText.en, ...data.strings };
-    localStorage.setItem(`annotation.uiText.${state.uiLanguage}`, JSON.stringify(data.strings));
+    localStorage.setItem(`annotation.uiText.${uiTextCacheVersion}.${state.uiLanguage}`, JSON.stringify(data.strings));
     updateUiText();
   } catch {
     state.uiText = baseUiText.ja || baseUiText.en || {};
@@ -206,7 +255,7 @@ async function applyUiLanguage(languageCode, options = {}) {
 
 function readCachedUiText(languageCode) {
   try {
-    return JSON.parse(localStorage.getItem(`annotation.uiText.${languageCode}`) || "");
+    return JSON.parse(localStorage.getItem(`annotation.uiText.${uiTextCacheVersion}.${languageCode}`) || "");
   } catch {
     return null;
   }
@@ -225,6 +274,7 @@ function updateUiText() {
   });
   refreshAutoLabel();
   updateDensityLabel(false);
+  updateNuanceLabel(false);
   updateStats();
   if (state.result) {
     renderWordList();
@@ -256,8 +306,12 @@ function setLevel(level) {
 
 function persistSettings() {
   localStorage.setItem("annotation.sourceText", els.sourceText.value);
+  localStorage.setItem("annotation.youtubeUrl", els.youtubeUrl.value);
+  localStorage.setItem("annotation.youtubeCorrect", String(els.youtubeCorrect.checked));
+  localStorage.setItem("annotation.inputMode", state.inputMode);
   localStorage.setItem("annotation.level", state.level);
   localStorage.setItem("annotation.density", els.densityRange.value);
+  localStorage.setItem("annotation.nuanceDetail", els.nuanceRange.value);
   localStorage.setItem("annotation.sourceLanguage", els.sourceLangSelect.value);
   localStorage.setItem("annotation.explanationLanguage", els.explanationLangSelect.value);
   localStorage.setItem("annotation.uiLanguage", els.uiLangSelect.value);
@@ -269,6 +323,103 @@ function persistSettings() {
 function updateDensityLabel(shouldPersist = true) {
   els.densityLabel.textContent = t(densityTextKeys[els.densityRange.value] || "densityStandard");
   if (shouldPersist) persistSettings();
+}
+
+function updateNuanceLabel(shouldPersist = true) {
+  els.nuanceLabel.textContent = t(nuanceTextKeys[els.nuanceRange.value] || "nuanceStandard");
+  if (shouldPersist) persistSettings();
+  if (state.result) {
+    renderAnnotatedText();
+    renderInlineNuanceList();
+    renderWordList();
+    closePopup();
+  }
+}
+
+function setInputMode(mode, shouldPersist = true) {
+  state.inputMode = mode === "youtube" ? "youtube" : "text";
+  document.querySelectorAll(".input-mode-tab").forEach((button) => {
+    const active = button.dataset.inputMode === state.inputMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  els.youtubeImportPanel.hidden = state.inputMode !== "youtube";
+  if (shouldPersist) persistSettings();
+}
+
+async function importYouTubeTranscript() {
+  const url = els.youtubeUrl.value.trim();
+  if (!url) {
+    setStatus(t("youtubeUrlRequired"), "error");
+    return;
+  }
+
+  persistSettings();
+  els.youtubeImportBtn.disabled = true;
+  els.youtubeImportBtn.textContent = t("youtubeImporting");
+  setStatus(t("youtubeImportStatus"), "");
+
+  try {
+    const response = await fetch("/api/youtube-transcript", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url,
+        sourceLanguage: els.sourceLangSelect.value,
+        correctWithAi: els.youtubeCorrect.checked,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.message || t(youtubeErrorTextKey(data.error)));
+      error.code = data.error;
+      throw error;
+    }
+
+    els.sourceText.value = data.transcript;
+    const sourceCode = normalizeCaptionLanguageCode(data.languageCode);
+    if ([...els.sourceLangSelect.options].some((option) => option.value === sourceCode)) {
+      els.sourceLangSelect.value = sourceCode;
+    }
+    state.result = null;
+    renderEmpty();
+    persistSettings();
+
+    const kind = data.isGenerated ? t("captionAuto") : t("captionManual");
+    els.youtubeMeta.textContent = [data.title, data.language, kind].filter(Boolean).join(" · ");
+    els.youtubeMeta.hidden = false;
+    const correction = t({
+      applied: "youtubeCorrectionApplied",
+      failed: "youtubeCorrectionFailed",
+      skipped: "youtubeCorrectionSkipped",
+    }[data.correctionStatus] || "youtubeCorrectionSkipped");
+    setStatus(t("youtubeImported", {
+      title: data.title || "YouTube",
+      chars: data.transcript.length,
+      correction,
+    }), data.correctionStatus === "failed" ? "" : "ok");
+  } catch (error) {
+    setStatus(error.code ? t(youtubeErrorTextKey(error.code)) : String(error.message || error), "error");
+  } finally {
+    els.youtubeImportBtn.disabled = false;
+    els.youtubeImportBtn.textContent = t("youtubeImport");
+  }
+}
+
+function youtubeErrorTextKey(code) {
+  return {
+    invalid_youtube_url: "youtubeUrlRequired",
+    youtube_no_captions: "youtubeNoCaptions",
+    youtube_blocked: "youtubeBlocked",
+    youtube_unavailable: "youtubeUnavailable",
+  }[code] || "youtubeImportFailed";
+}
+
+function normalizeCaptionLanguageCode(code) {
+  const normalized = String(code || "").toLowerCase().replace("_", "-");
+  if (normalized === "iw") return "he";
+  const base = normalized.split("-")[0];
+  return languageCatalog.some((language) => language.code === normalized) ? normalized : base;
 }
 
 async function checkHealth() {
@@ -325,7 +476,10 @@ async function annotate() {
 
     state.result = normalizeResult(data, text);
     renderResult();
-    setStatus(t("extracted", { count: state.result.annotations.length }), "ok");
+    setStatus(t("extracted", {
+      count: state.result.annotations.length,
+      nuances: state.result.connotations.length,
+    }), "ok");
     showTab("annotated");
   } catch (error) {
     setStatus(String(error.message || error), "error");
@@ -336,6 +490,7 @@ async function annotate() {
 
 function normalizeResult(data, fallbackText) {
   const annotations = Array.isArray(data.annotations) ? data.annotations : [];
+  const connotations = Array.isArray(data.connotations) ? data.connotations : [];
   const normalized = annotations
     .map((item, index) => ({
       id: item.id || `a${index + 1}`,
@@ -349,6 +504,34 @@ function normalizeResult(data, fallbackText) {
     }))
     .filter((item) => item.text && item.meaningJa);
 
+  const normalizedConnotations = connotations
+    .map((item, index) => ({
+      id: item.id || `c${index + 1}`,
+      text: String(item.text || ""),
+      start: Number.isInteger(item.start) ? item.start : null,
+      end: Number.isInteger(item.end) ? item.end : null,
+      scope: normalizeConnotationScope(item.scope),
+      category: normalizeConnotationCategory(item.category),
+      secondaryCategories: normalizeStringArray(item.secondaryCategories)
+        .filter((category) => connotationCategoryValues.includes(category))
+        .filter((category, categoryIndex, categories) => (
+          category !== normalizeConnotationCategory(item.category)
+          && categories.indexOf(category) === categoryIndex
+        )),
+      subtype: String(item.subtype || "unspecified").trim() || "unspecified",
+      literalMeaning: String(item.literalMeaning || "").trim(),
+      suggestedMeaning: String(item.suggestedMeaning || "").trim(),
+      pragmaticEffect: String(item.pragmaticEffect || "").trim(),
+      contextNote: String(item.contextNote || "").trim(),
+      confidence: ["high", "medium", "low"].includes(item.confidence) ? item.confidence : "medium",
+      alternatives: normalizeStringArray(item.alternatives),
+      evidence: normalizeStringArray(item.evidence),
+      conventionality: ["conventional", "contextual", "mixed"].includes(item.conventionality)
+        ? item.conventionality
+        : "contextual",
+    }))
+    .filter((item) => item.text && item.suggestedMeaning);
+
   return {
     sourceText: String(data.sourceText || fallbackText),
     sourceLanguage: data.sourceLanguage || els.sourceLangSelect.value,
@@ -358,6 +541,7 @@ function normalizeResult(data, fallbackText) {
     summaryJa: String(data.summaryJa || ""),
     translation: String(data.translation || data.translationText || ""),
     annotations: normalized,
+    connotations: normalizedConnotations,
     slashReading: Array.isArray(data.slashReading) ? data.slashReading : [],
   };
 }
@@ -367,9 +551,29 @@ function normalizeType(type) {
   return "vocab";
 }
 
+function normalizeConnotationScope(scope) {
+  return ["span", "sentence", "utterance", "passage"].includes(scope) ? scope : "span";
+}
+
+function normalizeConnotationCategory(category) {
+  return connotationCategoryValues.includes(category) ? category : "stance";
+}
+
+function normalizeStringArray(value) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+}
+
 function renderResult() {
   state.annotationsById = new Map(state.result.annotations.map((item) => [item.id, item]));
+  state.connotationsById = new Map(state.result.connotations.map((item) => [item.id, item]));
+  state.connotationsByAnnotationId = assignConnotationsToAnnotations(
+    state.result.annotations,
+    state.result.connotations,
+  );
   renderAnnotatedText();
+  renderInlineNuanceList();
   renderTranslation();
   renderWordList();
   renderSlashText();
@@ -379,22 +583,76 @@ function renderResult() {
 
 function renderAnnotatedText() {
   const text = state.result.sourceText;
-  const spans = buildHighlightSpans(text, state.result.annotations);
+  const annotationSpans = buildHighlightSpans(text, state.result.annotations);
+  const nuanceSpans = state.result.connotations.filter((item) => (
+    Number.isInteger(item.start)
+    && Number.isInteger(item.end)
+    && item.start >= 0
+    && item.end > item.start
+    && item.end <= text.length
+  ));
   els.annotatedText.classList.remove("empty");
   els.annotatedText.innerHTML = "";
 
-  let cursor = 0;
-  for (const span of spans) {
-    if (span.start > cursor) appendText(els.annotatedText, text.slice(cursor, span.start));
-    const mark = document.createElement("span");
-    mark.className = `hl hl-${span.item.type}`;
-    mark.dataset.id = span.item.id;
-    mark.textContent = text.slice(span.start, span.end);
-    mark.addEventListener("click", () => openPopup(span.item.id));
-    els.annotatedText.appendChild(mark);
-    cursor = span.end;
+  const boundaries = new Set([0, text.length]);
+  for (const span of [...annotationSpans, ...nuanceSpans]) {
+    boundaries.add(span.start);
+    boundaries.add(span.end);
   }
-  if (cursor < text.length) appendText(els.annotatedText, text.slice(cursor));
+
+  const points = [...boundaries].sort((a, b) => a - b);
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    if (end <= start) continue;
+
+    const annotation = annotationSpans.find((span) => span.start <= start && span.end >= end)?.item;
+    const nuances = nuanceSpans.filter((span) => span.start <= start && span.end >= end);
+    const classes = [];
+    if (annotation) classes.push("hl", `hl-${annotation.type}`);
+    if (nuances.length) classes.push("nuance-inline", annotation ? "nuance-overlap" : "nuance-only");
+
+    const segmentText = text.slice(start, end);
+    if (!classes.length) {
+      appendText(els.annotatedText, segmentText);
+      continue;
+    }
+
+    const title = nuances.length
+      ? `${t("nuance")}: ${nuances.map((item) => t(item.category)).join(" / ")}`
+      : t(typeTextKeys[annotation.type]);
+    appendInteractiveText(
+      els.annotatedText,
+      segmentText,
+      classes.join(" "),
+      () => (nuances.length ? openConnotationPopup(nuances[0].id) : openPopup(annotation.id)),
+      title,
+    );
+  }
+}
+
+function renderInlineNuanceList() {
+  const connotations = state.result?.connotations || [];
+  els.inlineNuanceList.innerHTML = "";
+  els.inlineNuancePanel.hidden = !connotations.length;
+  els.inlineNuanceCount.textContent = connotations.length;
+
+  for (const connotation of connotations) {
+    const button = document.createElement("button");
+    button.className = "inline-nuance-chip";
+    button.type = "button";
+    button.title = connotation.suggestedMeaning;
+
+    const target = document.createElement("span");
+    target.className = "inline-nuance-target";
+    target.textContent = connotation.text;
+    const category = document.createElement("span");
+    category.className = "inline-nuance-category";
+    category.textContent = t(connotation.category);
+    button.append(target, category);
+    button.addEventListener("click", () => openConnotationPopup(connotation.id));
+    els.inlineNuanceList.appendChild(button);
+  }
 }
 
 function renderTranslation() {
@@ -449,12 +707,18 @@ function appendText(parent, text) {
 
 function renderWordList() {
   els.wordList.innerHTML = "";
-  if (!state.result.annotations.length) {
+  const annotations = state.result.annotations;
+  const connotations = state.result.connotations;
+  if (!annotations.length && !connotations.length) {
     els.wordList.appendChild(emptyCard(t("emptyWords")));
     return;
   }
 
-  for (const item of state.result.annotations) {
+  const attachedConnotationIds = new Set();
+  for (const item of annotations) {
+    const related = state.connotationsByAnnotationId.get(item.id) || [];
+    related.forEach((connotation) => attachedConnotationIds.add(connotation.id));
+
     const card = document.createElement("article");
     card.className = "word-card";
     card.innerHTML = `
@@ -471,9 +735,145 @@ function renderWordList() {
     card.querySelector(".meaning").textContent = item.meaningJa;
     card.querySelector(".note").textContent = item.noteJa;
     card.querySelector(".example").textContent = item.example ? `${t("examplePrefix")}${item.example}` : "";
+    if (related.length) card.appendChild(renderNuanceBlock(related));
     card.addEventListener("click", () => openPopup(item.id));
     els.wordList.appendChild(card);
   }
+
+  for (const connotation of connotations) {
+    if (attachedConnotationIds.has(connotation.id)) continue;
+    const card = document.createElement("article");
+    card.className = "word-card nuance-card";
+    const head = document.createElement("div");
+    head.className = "word-card-head";
+    const title = document.createElement("h3");
+    title.textContent = connotation.text;
+    head.append(title, renderCategoryBadges(connotation));
+    card.append(head, renderNuanceBlock([connotation], { hideCategory: true }));
+    card.addEventListener("click", () => openConnotationPopup(connotation.id));
+    els.wordList.appendChild(card);
+  }
+}
+
+function appendInteractiveText(parent, text, className, onClick, title) {
+  const parts = text.split(/(\n+)/);
+  for (const part of parts) {
+    if (!part) continue;
+    if (/^\n+$/.test(part)) {
+      for (let index = 0; index < part.length; index += 1) {
+        parent.appendChild(document.createElement("br"));
+      }
+      continue;
+    }
+    const mark = document.createElement("span");
+    mark.className = className;
+    mark.textContent = part;
+    mark.title = title;
+    mark.addEventListener("click", onClick);
+    parent.appendChild(mark);
+  }
+}
+
+function assignConnotationsToAnnotations(annotations, connotations) {
+  const assignments = new Map();
+  for (const connotation of connotations) {
+    if (connotation.scope !== "span") continue;
+    let best = null;
+    for (const annotation of annotations) {
+      const score = connotationAnnotationScore(connotation, annotation);
+      if (score > 0 && (!best || score > best.score)) best = { annotation, score };
+    }
+    if (!best) continue;
+    const items = assignments.get(best.annotation.id) || [];
+    items.push(connotation);
+    assignments.set(best.annotation.id, items);
+  }
+  return assignments;
+}
+
+function connotationAnnotationScore(connotation, annotation) {
+  const hasRanges = [connotation.start, connotation.end, annotation.start, annotation.end]
+    .every(Number.isInteger);
+  if (hasRanges) {
+    if (connotation.start === annotation.start && connotation.end === annotation.end) return 10000;
+    if (annotation.start >= connotation.start && annotation.end <= connotation.end) {
+      const edgeBonus = annotation.start === connotation.start ? 5000 : 0;
+      return 1000 + edgeBonus + (annotation.end - annotation.start);
+    }
+    const overlap = Math.min(connotation.end, annotation.end) - Math.max(connotation.start, annotation.start);
+    if (overlap > 0) return overlap;
+  }
+  if (connotation.text === annotation.text) return 10000;
+  if (connotation.text.includes(annotation.text)) return 100 + annotation.text.length;
+  return 0;
+}
+
+function renderNuanceBlock(connotations, options = {}) {
+  const detail = Number(els.nuanceRange.value || 2);
+  const block = document.createElement("div");
+  block.className = `nuance-block nuance-detail-${detail}`;
+
+  for (const connotation of connotations) {
+    const entry = document.createElement("section");
+    entry.className = "nuance-entry";
+
+    if (!options.hideCategory) {
+      entry.appendChild(renderCategoryBadges(connotation));
+    }
+
+    if (detail === 1) {
+      appendNuanceRow(entry, "", connotation.suggestedMeaning, "nuance-summary");
+    } else {
+      appendNuanceRow(entry, "nuanceSurface", connotation.literalMeaning);
+      appendNuanceRow(entry, "nuanceSuggested", connotation.suggestedMeaning, "nuance-summary");
+      appendNuanceRow(entry, "nuanceEffect", connotation.pragmaticEffect);
+      appendNuanceRow(entry, "nuanceContext", connotation.contextNote);
+    }
+
+    if (detail >= 3) {
+      appendNuanceRow(entry, "nuanceAlternatives", connotation.alternatives.join(" / "));
+      appendNuanceRow(entry, "nuanceEvidence", connotation.evidence.join(" / "));
+      appendNuanceRow(entry, "nuanceConfidence", t(`confidence${capitalize(connotation.confidence)}`));
+      appendNuanceRow(entry, "nuanceConventionality", t(connotation.conventionality));
+    }
+    block.appendChild(entry);
+  }
+  return block;
+}
+
+function renderCategoryBadges(connotation) {
+  const group = document.createElement("span");
+  group.className = "badge-group";
+
+  const primary = document.createElement("span");
+  primary.className = "badge nuance";
+  primary.textContent = `${t("primaryCategory")}: ${t(connotation.category)}`;
+  group.appendChild(primary);
+
+  for (const category of connotation.secondaryCategories || []) {
+    const secondary = document.createElement("span");
+    secondary.className = "badge nuance-secondary";
+    secondary.textContent = `${t("secondaryCategory")}: ${t(category)}`;
+    group.appendChild(secondary);
+  }
+  return group;
+}
+
+function appendNuanceRow(parent, labelKey, value, className = "") {
+  if (!value) return;
+  const row = document.createElement("p");
+  row.className = `nuance-row ${className}`.trim();
+  if (labelKey) {
+    const label = document.createElement("strong");
+    label.textContent = t(labelKey);
+    row.append(label, document.createTextNode(" "));
+  }
+  row.appendChild(document.createTextNode(value));
+  parent.appendChild(row);
+}
+
+function capitalize(value) {
+  return value ? value[0].toUpperCase() + value.slice(1) : "";
 }
 
 function renderSlashText() {
@@ -503,21 +903,40 @@ function renderExportJson() {
 
 function updateStats() {
   const items = state.result?.annotations || [];
+  const connotations = state.result?.connotations || [];
   els.statVocab.textContent = items.filter((item) => item.type === "vocab").length;
   els.statPhrase.textContent = items.filter((item) => item.type === "phrase" || item.type === "idiom").length;
   els.statGrammar.textContent = items.filter((item) => item.type === "grammar").length;
+  els.statNuance.textContent = connotations.length;
   els.statLevel.textContent = t(levelTextKeys[state.level] || "intermediate");
 }
 
 function openPopup(id) {
   const item = state.annotationsById.get(id);
   if (!item) return;
+  const related = state.connotationsByAnnotationId.get(item.id) || [];
   els.popupWord.textContent = item.text;
   els.popupType.textContent = t(typeTextKeys[item.type]);
   els.popupType.className = `popup-type badge ${item.type}`;
   els.popupDef.textContent = item.meaningJa;
   els.popupNote.textContent = item.noteJa;
   els.popupExample.textContent = item.example ? `${t("examplePrefix")}${item.example}` : "";
+  els.popupNuances.innerHTML = "";
+  if (related.length) els.popupNuances.appendChild(renderNuanceBlock(related));
+  els.overlay.classList.add("show");
+}
+
+function openConnotationPopup(id) {
+  const item = state.connotationsById.get(id);
+  if (!item) return;
+  els.popupWord.textContent = item.text;
+  els.popupType.textContent = t("nuance");
+  els.popupType.className = "popup-type badge nuance";
+  els.popupDef.textContent = "";
+  els.popupNote.textContent = "";
+  els.popupExample.textContent = "";
+  els.popupNuances.innerHTML = "";
+  els.popupNuances.appendChild(renderNuanceBlock([item]));
   els.overlay.classList.add("show");
 }
 
@@ -548,6 +967,9 @@ function setStatus(message, kind) {
 function renderEmpty() {
   els.annotatedText.classList.add("empty");
   els.annotatedText.textContent = t("emptyAnnotated");
+  els.inlineNuancePanel.hidden = true;
+  els.inlineNuanceList.innerHTML = "";
+  els.inlineNuanceCount.textContent = "0";
   els.translationText.classList.add("empty");
   els.translationText.textContent = t("translationEmpty");
   els.wordList.innerHTML = "";
@@ -555,6 +977,9 @@ function renderEmpty() {
   els.slashText.classList.add("empty");
   els.slashText.textContent = t("slashEmpty");
   els.exportText.value = "";
+  state.annotationsById = new Map();
+  state.connotationsById = new Map();
+  state.connotationsByAnnotationId = new Map();
   updateStats();
 }
 
@@ -603,6 +1028,17 @@ async function copyMarkdown() {
     "",
     "## Annotations",
     ...state.result.annotations.map((item) => `- **${item.text}** (${t(typeTextKeys[item.type])}): ${item.meaningJa}${item.noteJa ? ` / ${item.noteJa}` : ""}`),
+    "",
+    `## ${t("nuance")}`,
+    ...(state.result.connotations.length
+      ? state.result.connotations.map((item) => [
+          `- **${item.text}** (${[item.category, ...item.secondaryCategories].map((category) => t(category)).join(" / ")}): ${item.suggestedMeaning}`,
+          `  - ${t("nuanceSurface")}: ${item.literalMeaning}`,
+          `  - ${t("nuanceEffect")}: ${item.pragmaticEffect}`,
+          `  - ${t("nuanceContext")}: ${item.contextNote}`,
+          `  - ${t("nuanceConfidence")}: ${t(`confidence${capitalize(item.confidence)}`)}`,
+        ].join("\n"))
+      : [`- ${t("noNuances")}`]),
   ];
   await navigator.clipboard.writeText(lines.join("\n"));
   els.exportText.value = lines.join("\n");

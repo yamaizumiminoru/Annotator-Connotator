@@ -1,0 +1,496 @@
+{
+  "version": 1,
+  "languages": ["ja", "en"],
+  "categories": [
+    "evaluative",
+    "stance",
+    "politeness",
+    "implicature",
+    "presupposition",
+    "register",
+    "irony",
+    "euphemism"
+  ],
+  "cases": [
+    {
+      "id": "ja-evaluative-clear",
+      "language": "ja",
+      "category": "evaluative",
+      "pattern": "clear",
+      "sourceText": "その説明は子供っぽくて、説得力に欠ける。",
+      "targetText": "子供っぽくて",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["evaluative"],
+        "requiredIdeas": ["childish rather than merely childlike", "negative evaluation"],
+        "forbiddenClaims": ["literal age of the speaker", "hostility"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "en-evaluative-contrast",
+      "language": "en",
+      "category": "evaluative",
+      "pattern": "contrast",
+      "sourceText": "The columnist described the actor as skinny in an otherwise admiring profile.",
+      "targetText": "skinny",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["evaluative"],
+        "requiredIdeas": ["often less positive than slim", "can suggest unattractive or excessive thinness"],
+        "forbiddenClaims": ["medical diagnosis", "deliberate insult as a certainty"],
+        "contextDependency": "medium"
+      }
+    },
+    {
+      "id": "ja-evaluative-context",
+      "language": "ja",
+      "category": "evaluative",
+      "pattern": "context",
+      "sourceText": "この子供っぽい色使いが、むしろ作品の魅力だ。",
+      "targetText": "子供っぽい",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["evaluative"],
+        "requiredIdeas": ["usually risks a negative evaluation", "the context positively reframes it as charm"],
+        "forbiddenClaims": ["unambiguously negative in this sentence"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "en-evaluative-negative",
+      "language": "en",
+      "category": "evaluative",
+      "pattern": "negative",
+      "sourceText": "The cable is two meters long.",
+      "targetText": "",
+      "expected": {
+        "shouldDetect": false,
+        "acceptableCategories": [],
+        "requiredIdeas": [],
+        "forbiddenClaims": ["approval", "disapproval", "emotional distance"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "en-stance-clear",
+      "language": "en",
+      "category": "stance",
+      "pattern": "clear",
+      "sourceText": "Apparently, the committee has already reached a decision.",
+      "targetText": "Apparently",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["stance"],
+        "requiredIdeas": ["the speaker presents the information as indirect or not fully personally guaranteed"],
+        "forbiddenClaims": ["the information is false", "sarcasm"],
+        "contextDependency": "medium"
+      }
+    },
+    {
+      "id": "ja-stance-context",
+      "language": "ja",
+      "category": "stance",
+      "pattern": "context",
+      "sourceText": "正直なところ、その案にはまだ納得していません。",
+      "targetText": "正直なところ",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["stance"],
+        "requiredIdeas": ["signals candor", "prepares the listener for a potentially unwelcome opinion"],
+        "forbiddenClaims": ["the speaker was previously lying"],
+        "contextDependency": "medium"
+      }
+    },
+    {
+      "id": "en-stance-contrast",
+      "language": "en",
+      "category": "stance",
+      "pattern": "contrast",
+      "sourceText": "Apparently, the door was unlocked; I later checked it myself and confirmed that it was.",
+      "targetText": "Apparently",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["stance"],
+        "requiredIdeas": ["initially marks indirect evidence", "later personal confirmation changes the evidential situation"],
+        "forbiddenClaims": ["the final claim remains merely hearsay"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "ja-stance-negative",
+      "language": "ja",
+      "category": "stance",
+      "pattern": "negative",
+      "sourceText": "会議は三階の会議室で午後二時に始まります。",
+      "targetText": "",
+      "expected": {
+        "shouldDetect": false,
+        "acceptableCategories": [],
+        "requiredIdeas": [],
+        "forbiddenClaims": ["speaker doubt", "reluctance", "criticism"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "en-politeness-positive",
+      "language": "en",
+      "category": "politeness",
+      "pattern": "clear",
+      "sourceText": "Come on, you're one of us. Sit with us and tell us what happened.",
+      "targetText": "you're one of us",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["politeness", "register"],
+        "requiredIdeas": ["solidarity", "closeness or inclusion"],
+        "forbiddenClaims": ["coercion as a certainty", "formal deference"],
+        "contextDependency": "medium"
+      }
+    },
+    {
+      "id": "ja-politeness-contrast",
+      "language": "ja",
+      "category": "politeness",
+      "pattern": "contrast",
+      "sourceText": "受付では「恐れ入りますが、こちらにご記入いただけますでしょうか」と案内し、休憩中は同僚に「ここ書いて」と頼んだ。",
+      "targetText": "恐れ入りますが",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["politeness", "register"],
+        "requiredIdeas": ["deference", "acknowledges burden before a request", "contrasts with the later casual request"],
+        "forbiddenClaims": ["fear in the literal emotional sense", "hostility"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "ja-politeness-context",
+      "language": "ja",
+      "category": "politeness",
+      "pattern": "context",
+      "sourceText": "担当者は「検討しておきます。金曜日までに費用を比較して回答します」と答えた。",
+      "targetText": "検討しておきます",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["politeness", "implicature"],
+        "requiredIdeas": ["can sometimes avoid commitment", "the concrete follow-up plan supports a literal commitment here"],
+        "forbiddenClaims": ["definite rejection", "no action will occur"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "en-politeness-negative",
+      "language": "en",
+      "category": "politeness",
+      "pattern": "negative",
+      "sourceText": "The report contains three sections and two appendices.",
+      "targetText": "",
+      "expected": {
+        "shouldDetect": false,
+        "acceptableCategories": [],
+        "requiredIdeas": [],
+        "forbiddenClaims": ["solidarity", "deference", "indirect refusal"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "en-implicature-clear",
+      "language": "en",
+      "category": "implicature",
+      "pattern": "clear",
+      "sourceText": "Some students passed the exam.",
+      "targetText": "Some students passed",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["implicature"],
+        "requiredIdeas": ["often suggests not all", "not all is not logically entailed"],
+        "forbiddenClaims": ["proves that some students failed"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "ja-implicature-context",
+      "language": "ja",
+      "category": "implicature",
+      "pattern": "context",
+      "sourceText": "「もう一軒行きませんか」と誘われて、彼女は時計を見ながら「もう遅いですよ」と答えた。",
+      "targetText": "もう遅いですよ",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["implicature", "politeness"],
+        "requiredIdeas": ["contextually functions as declining the invitation", "the refusal is indirect"],
+        "forbiddenClaims": ["the sentence literally says I refuse", "anger"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "en-implicature-cancellation",
+      "language": "en",
+      "category": "implicature",
+      "pattern": "contrast",
+      "sourceText": "Some students passed the exam. In fact, all of them did.",
+      "targetText": "Some students passed the exam",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["implicature"],
+        "requiredIdeas": ["the usual not-all inference is explicitly cancelled", "the two sentences are not logically contradictory"],
+        "forbiddenClaims": ["some students failed", "contradiction"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "ja-implicature-negative",
+      "language": "ja",
+      "category": "implicature",
+      "pattern": "negative",
+      "sourceText": "水は摂氏零度で凍ります。",
+      "targetText": "",
+      "expected": {
+        "shouldDetect": false,
+        "acceptableCategories": [],
+        "requiredIdeas": [],
+        "forbiddenClaims": ["indirect refusal", "hidden warning", "speaker criticism"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "en-presupposition-clear",
+      "language": "en",
+      "category": "presupposition",
+      "pattern": "clear",
+      "sourceText": "Even Ken passed the qualifying exam.",
+      "targetText": "Even Ken",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["presupposition", "evaluative"],
+        "requiredIdeas": ["Ken was relatively unexpected to pass", "does not necessarily insult Ken"],
+        "forbiddenClaims": ["Ken is unintelligent as a fact"],
+        "contextDependency": "medium"
+      }
+    },
+    {
+      "id": "ja-presupposition-context",
+      "language": "ja",
+      "category": "presupposition",
+      "pattern": "context",
+      "sourceText": "何度も注意された彼は、また締切に遅れた。",
+      "targetText": "また",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["presupposition", "stance"],
+        "requiredIdeas": ["presupposes or presents a previous late occurrence as shared background"],
+        "forbiddenClaims": ["proves habitual irresponsibility", "anger as a certainty"],
+        "contextDependency": "medium"
+      }
+    },
+    {
+      "id": "ja-presupposition-correction",
+      "language": "ja",
+      "category": "presupposition",
+      "pattern": "contrast",
+      "sourceText": "彼はまた遅れた、と私は言いかけたが、確認すると今回が初めてだった。",
+      "targetText": "また遅れた",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["presupposition"],
+        "requiredIdeas": ["the initial repeated-event assumption is corrected by later context"],
+        "forbiddenClaims": ["there definitely was an earlier delay"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "en-presupposition-negative",
+      "language": "en",
+      "category": "presupposition",
+      "pattern": "negative",
+      "sourceText": "The printer uses recycled paper.",
+      "targetText": "",
+      "expected": {
+        "shouldDetect": false,
+        "acceptableCategories": [],
+        "requiredIdeas": [],
+        "forbiddenClaims": ["surprise", "prior printer failure", "moral approval"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "ja-register-clear",
+      "language": "ja",
+      "category": "register",
+      "pattern": "clear",
+      "sourceText": "どうぞこちらでお召し上がりください。",
+      "targetText": "お召し上がりください",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["register", "politeness"],
+        "requiredIdeas": ["honorific respectful form", "positions the addressee with deference"],
+        "forbiddenClaims": ["speaker inferiority as a personal trait"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "en-register-contrast",
+      "language": "en",
+      "category": "register",
+      "pattern": "contrast",
+      "sourceText": "The formal report repeatedly calls the participants kids rather than children.",
+      "targetText": "kids",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["register", "evaluative"],
+        "requiredIdeas": ["more informal than children", "may sound conversational in a formal report"],
+        "forbiddenClaims": ["necessarily disrespectful"],
+        "contextDependency": "medium"
+      }
+    },
+    {
+      "id": "en-register-context",
+      "language": "en",
+      "category": "register",
+      "pattern": "context",
+      "sourceText": "The pediatrician said kids while chatting with the family, then wrote children in the medical report.",
+      "targetText": "kids",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["register", "politeness"],
+        "requiredIdeas": ["informal wording suits the conversational setting", "the later formal term marks a register shift"],
+        "forbiddenClaims": ["unprofessional behavior as a certainty"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "ja-register-negative",
+      "language": "ja",
+      "category": "register",
+      "pattern": "negative",
+      "sourceText": "この箱には鉛筆が十二本入っています。",
+      "targetText": "",
+      "expected": {
+        "shouldDetect": false,
+        "acceptableCategories": [],
+        "requiredIdeas": [],
+        "forbiddenClaims": ["social hierarchy", "formality contrast", "closeness"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "en-irony-clear",
+      "language": "en",
+      "category": "irony",
+      "pattern": "clear",
+      "sourceText": "You deleted the final file five minutes before the deadline. Great job.",
+      "targetText": "Great job",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["irony", "evaluative"],
+        "requiredIdeas": ["positive wording is reversed by the failure context", "functions as criticism"],
+        "forbiddenClaims": ["genuine praise"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "ja-irony-context",
+      "language": "ja",
+      "category": "irony",
+      "pattern": "context",
+      "sourceText": "大事な資料を全部消したんですか。さすが田中さんですね。",
+      "targetText": "さすが田中さんですね",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["irony", "evaluative"],
+        "requiredIdeas": ["context makes the apparent praise ironic", "functions as criticism"],
+        "forbiddenClaims": ["genuine admiration"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "ja-irony-contrast",
+      "language": "ja",
+      "category": "irony",
+      "pattern": "contrast",
+      "sourceText": "難しい交渉を予定より早くまとめたんですか。さすが田中さんですね。",
+      "targetText": "さすが田中さんですね",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["evaluative", "politeness"],
+        "requiredIdeas": ["genuine praise is supported by the successful context", "irony should not be asserted"],
+        "forbiddenClaims": ["sarcasm", "criticism"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "en-irony-negative",
+      "language": "en",
+      "category": "irony",
+      "pattern": "negative",
+      "sourceText": "You fixed every error before the deadline. Great job.",
+      "targetText": "Great job",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["evaluative", "politeness"],
+        "requiredIdeas": ["genuine praise", "positive evaluation"],
+        "forbiddenClaims": ["irony", "hidden criticism"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "en-euphemism-clear",
+      "language": "en",
+      "category": "euphemism",
+      "pattern": "clear",
+      "sourceText": "Her grandfather passed away peacefully last night.",
+      "targetText": "passed away",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["euphemism", "register"],
+        "requiredIdeas": ["euphemistic alternative to died", "softens a sensitive topic"],
+        "forbiddenClaims": ["denial that death occurred"],
+        "contextDependency": "low"
+      }
+    },
+    {
+      "id": "ja-euphemism-context",
+      "language": "ja",
+      "category": "euphemism",
+      "pattern": "context",
+      "sourceText": "会社は業績悪化を受けて、百人規模のリストラを発表した。",
+      "targetText": "リストラ",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["euphemism", "register"],
+        "requiredIdeas": ["often used as a softened business term for job cuts or dismissal", "broader literal origin in restructuring"],
+        "forbiddenClaims": ["all restructuring necessarily means dismissal"],
+        "contextDependency": "medium"
+      }
+    },
+    {
+      "id": "en-euphemism-contrast",
+      "language": "en",
+      "category": "euphemism",
+      "pattern": "contrast",
+      "sourceText": "Management called the plan rightsizing; the employees called it layoffs.",
+      "targetText": "rightsizing",
+      "expected": {
+        "shouldDetect": true,
+        "acceptableCategories": ["euphemism", "stance", "register"],
+        "requiredIdeas": ["management wording softens or positively frames job cuts", "the contrast exposes competing perspectives"],
+        "forbiddenClaims": ["neutral synonym with no framing effect"],
+        "contextDependency": "high"
+      }
+    },
+    {
+      "id": "ja-euphemism-negative",
+      "language": "ja",
+      "category": "euphemism",
+      "pattern": "negative",
+      "sourceText": "窓の外では雨が静かに降っている。",
+      "targetText": "",
+      "expected": {
+        "shouldDetect": false,
+        "acceptableCategories": [],
+        "requiredIdeas": [],
+        "forbiddenClaims": ["euphemism", "hidden death reference", "corporate framing"],
+        "contextDependency": "low"
+      }
+    }
+  ]
+}

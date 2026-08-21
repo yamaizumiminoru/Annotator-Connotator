@@ -16,9 +16,10 @@ if (-not ($rawPid -match "^\d+$")) {
   exit 0
 }
 
-$process = Get-Process -Id ([int]$rawPid) -ErrorAction SilentlyContinue
-if ($process) {
-  Stop-Process -Id $process.Id
+$serverProcess = Get-Process -Id ([int]$rawPid) -ErrorAction SilentlyContinue
+if ($serverProcess) {
+  $serverProcess.Kill()
+  $serverProcess.WaitForExit(5000)
   Write-Host "Stopped Annotator-Connotator server."
 } else {
   Write-Host "Server process was not running."

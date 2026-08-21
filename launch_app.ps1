@@ -66,6 +66,18 @@ if (Test-AppHealth $healthUrl) {
   Write-Host "Annotator-Connotator is already running: $appUrl"
 } else {
   $node = Get-NodePath
+  $youtubeModule = Join-Path $AppDir "node_modules\@hallelx\youtube-transcript\package.json"
+  if (-not (Test-Path -LiteralPath $youtubeModule)) {
+    $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
+    if (-not $npm) {
+      throw "npm.cmd was not found. Install Node.js with npm to enable YouTube transcript import."
+    }
+    Write-Host "Installing app dependencies..."
+    & $npm.Source install --omit=dev --no-audit --no-fund --cache (Join-Path $AppDir ".npm-cache")
+    if ($LASTEXITCODE -ne 0) {
+      throw "App dependency installation failed."
+    }
+  }
   $outLog = Join-Path $AppDir "server.out.log"
   $errLog = Join-Path $AppDir "server.err.log"
 

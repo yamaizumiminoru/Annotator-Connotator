@@ -19,6 +19,22 @@
         </div>
 
         <label class="field-label" for="sourceText" data-i18n="inputText">入力文</label>
+        <div class="input-mode-tabs" role="tablist" aria-label="Input source">
+          <button class="input-mode-tab active" data-input-mode="text" data-i18n="textInputMode" type="button">文章</button>
+          <button class="input-mode-tab" data-input-mode="youtube" data-i18n="youtubeInputMode" type="button">YouTube</button>
+        </div>
+        <section class="youtube-import-panel" id="youtubeImportPanel" hidden>
+          <label class="field-label" for="youtubeUrl" data-i18n="youtubeUrl">YouTube URL</label>
+          <div class="youtube-url-row">
+            <input id="youtubeUrl" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=...">
+            <button class="ghost-btn youtube-import-btn" id="youtubeImportBtn" data-i18n="youtubeImport" type="button">字幕を取得</button>
+          </div>
+          <label class="youtube-correction-toggle">
+            <input id="youtubeCorrect" type="checkbox" checked>
+            <span data-i18n="correctTranscript">音声認識ミスをAIで補正</span>
+          </label>
+          <p class="youtube-meta" id="youtubeMeta" hidden></p>
+        </section>
         <textarea id="sourceText" spellcheck="false"></textarea>
 
         <div class="language-grid">
@@ -44,7 +60,6 @@
             <button class="segment" data-level="beginner" data-i18n="beginner" type="button">基礎</button>
             <button class="segment active" data-level="intermediate" data-i18n="intermediate" type="button">中級</button>
             <button class="segment" data-level="advanced" data-i18n="advanced" type="button">上級</button>
-            <button class="segment" data-level="academic" data-i18n="academic" type="button">学術</button>
           </div>
         </div>
 
@@ -58,13 +73,18 @@
           <label class="select-field" for="focusSelect">
             <span data-i18n="focus">観点</span>
             <select id="focusSelect">
-              <option value="balanced" data-i18n="balanced">バランス</option>
+              <option value="all" data-i18n="allFocus">すべて</option>
               <option value="speaking" data-i18n="speaking">会話で使う</option>
               <option value="academic" data-i18n="academicFocus">論文・発表</option>
-              <option value="grammar" data-i18n="grammarFocus">構文</option>
             </select>
           </label>
         </div>
+
+        <label class="slider-field nuance-display-control" for="nuanceRange">
+          <span data-i18n="nuanceDetail">ニュアンス表示</span>
+          <strong id="nuanceLabel">標準</strong>
+          <input id="nuanceRange" type="range" min="1" max="3" step="1" value="2">
+        </label>
 
         <div class="toggle-grid">
           <label><input id="includeGrammar" type="checkbox" checked> <span data-i18n="includeGrammar">構文も拾う</span></label>
@@ -76,7 +96,7 @@
             <span class="btn-icon">A</span>
             <span data-i18n="analyze">解析</span>
           </button>
-          <button class="ghost-btn" id="sampleBtn" data-i18n="sample" type="button">例文</button>
+          <button class="ghost-btn" id="sampleBtn" data-i18n="sample" type="button">サンプル</button>
           <button class="ghost-btn" id="clearBtn" data-i18n="clear" type="button">消去</button>
         </div>
 
@@ -107,6 +127,10 @@
             <span id="statGrammar">0</span>
             <small data-i18n="grammar">構文</small>
           </div>
+          <div class="stat nuance-stat">
+            <span id="statNuance">0</span>
+            <small data-i18n="nuance">ニュアンス</small>
+          </div>
           <div class="stat">
             <span id="statLevel">中級</span>
             <small data-i18n="setting">設定</small>
@@ -118,12 +142,20 @@
           <span><i class="dot phrase"></i><span data-i18n="expression">表現</span></span>
           <span><i class="dot idiom"></i><span data-i18n="idiom">イディオム</span></span>
           <span><i class="dot grammar"></i><span data-i18n="grammar">構文</span></span>
+          <span><i class="dot nuance"></i><span data-i18n="nuance">ニュアンス</span></span>
         </div>
 
         <section class="panel active" id="panel-annotated">
           <article class="script-card">
             <div class="script-text" id="annotatedText"></div>
           </article>
+          <section class="inline-nuance-panel" id="inlineNuancePanel" hidden>
+            <div class="inline-nuance-heading">
+              <h2 data-i18n="nuance">ニュアンス</h2>
+              <span id="inlineNuanceCount"></span>
+            </div>
+            <div class="inline-nuance-list" id="inlineNuanceList"></div>
+          </section>
           <article class="translation-card">
             <h2 data-i18n="translationTitle">解説言語での翻訳</h2>
             <p id="translationText"></p>
@@ -159,6 +191,7 @@
       <p class="popup-def" id="popupDef"></p>
       <p class="popup-note" id="popupNote"></p>
       <p class="popup-ex" id="popupExample"></p>
+      <div class="popup-nuances" id="popupNuances"></div>
     </article>
   </div>
 

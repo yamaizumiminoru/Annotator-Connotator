@@ -18,6 +18,8 @@
   --idiom-fg: #245b2f;
   --grammar-bg: #f1e4f4;
   --grammar-fg: #643a70;
+  --nuance-bg: #f9e4de;
+  --nuance-fg: #7b3528;
   font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
 }
 
@@ -147,6 +149,73 @@ h1 {
   padding: 12px;
 }
 
+.input-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.input-mode-tab {
+  min-height: 36px;
+  border: 0;
+  background: #fffdf7;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.input-mode-tab + .input-mode-tab {
+  border-left: 1px solid var(--line);
+}
+
+.input-mode-tab.active {
+  background: var(--accent);
+  color: white;
+}
+
+.youtube-import-panel {
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfaf5;
+}
+
+.youtube-url-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+#youtubeUrl {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+  padding: 7px 9px;
+}
+
+.youtube-import-btn {
+  white-space: nowrap;
+}
+
+.youtube-correction-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.youtube-meta {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 #exportText {
   min-height: 360px;
   margin-top: 12px;
@@ -165,7 +234,7 @@ input:focus {
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
@@ -205,6 +274,10 @@ input:focus {
 
 .control-grid {
   grid-template-columns: 1fr 1fr;
+}
+
+.nuance-display-control {
+  display: block;
 }
 
 .language-grid {
@@ -362,7 +435,7 @@ select {
 
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 9px;
   margin-bottom: 12px;
 }
@@ -403,6 +476,7 @@ select {
 .dot.phrase { background: #3a8ca4; }
 .dot.idiom { background: #59a45f; }
 .dot.grammar { background: #a16daf; }
+.dot.nuance { background: #c5523c; }
 
 .panel {
   display: none;
@@ -477,6 +551,85 @@ select {
 .hl-idiom { background: var(--idiom-bg); color: var(--idiom-fg); }
 .hl-grammar { background: var(--grammar-bg); color: var(--grammar-fg); }
 
+.nuance-inline {
+  box-shadow: inset 0 -2px 0 var(--accent-2);
+  cursor: pointer;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.nuance-only {
+  padding: 2px 3px;
+  background: var(--nuance-bg);
+  border-radius: 4px;
+}
+
+.inline-nuance-panel {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent-2);
+  background: #fff8f5;
+}
+
+.inline-nuance-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.inline-nuance-heading h2 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.inline-nuance-heading span {
+  color: var(--nuance-fg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inline-nuance-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.inline-nuance-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #e5b8ad;
+  border-radius: 6px;
+  background: #fffdfb;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.inline-nuance-chip:hover {
+  border-color: var(--accent-2);
+  background: var(--nuance-bg);
+}
+
+.inline-nuance-target {
+  overflow: hidden;
+  max-width: 260px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.inline-nuance-category {
+  margin-left: 7px;
+  color: var(--nuance-fg);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .slash {
   color: var(--accent-2);
   font-size: 13px;
@@ -520,12 +673,79 @@ select {
 .badge.phrase { background: var(--phrase-bg); color: var(--phrase-fg); }
 .badge.idiom { background: var(--idiom-bg); color: var(--idiom-fg); }
 .badge.grammar { background: var(--grammar-bg); color: var(--grammar-fg); }
+.badge.nuance { background: var(--nuance-bg); color: var(--nuance-fg); }
+
+.badge-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.badge.nuance-secondary {
+  border: 1px solid #dfb4aa;
+  background: transparent;
+  color: var(--nuance-fg);
+}
 
 .word-card p {
   margin: 7px 0 0;
   color: var(--muted);
   line-height: 1.6;
   font-size: 13px;
+}
+
+.word-card {
+  cursor: pointer;
+}
+
+.nuance-card {
+  border-left: 4px solid var(--accent-2);
+}
+
+.nuance-block {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+
+.nuance-entry + .nuance-entry {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.nuance-entry > .badge-group {
+  display: inline-flex;
+  margin-bottom: 3px;
+}
+
+.word-card .nuance-row,
+.popup .nuance-row {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.word-card .nuance-row strong,
+.popup .nuance-row strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.word-card .nuance-summary,
+.popup .nuance-summary {
+  color: var(--nuance-fg);
+}
+
+.nuance-detail-1 {
+  padding-top: 9px;
+}
+
+.nuance-detail-1 .nuance-row {
+  margin-top: 4px;
 }
 
 .export-grid {
@@ -590,6 +810,14 @@ select {
   line-height: 1.7;
 }
 
+.popup-nuances:empty {
+  display: none;
+}
+
+.popup-nuances .nuance-block {
+  margin-top: 4px;
+}
+
 .popup-note {
   color: var(--muted);
   font-size: 13px;
@@ -631,8 +859,21 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .youtube-url-row {
+    grid-template-columns: 1fr;
+  }
+
   .script-card {
     min-height: 360px;
     padding: 18px;
+  }
+
+  .inline-nuance-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .inline-nuance-target {
+    max-width: calc(100% - 96px);
   }
 }
