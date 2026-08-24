@@ -1,7 +1,7 @@
 # Annotator-Connotator
 
 Turn any text into language-learning material with annotations, translations, and connotation-aware explanations.
-The default model is `gpt-5.6-sol`.
+Standard analysis uses `gpt-5.6-luna`; precise analysis uses `gpt-5.6-sol`.
 The app provides 71 quality-screened languages for source text, explanations, and the interface.
 
 ## Name
@@ -47,13 +47,14 @@ variable on the host.
 - Shows a full translation in the selected explanation language.
 - Adjusts extraction difficulty: beginner, intermediate, advanced.
 - Adjusts annotation density.
+- Switches between faster standard analysis with Luna and optional precise analysis with Sol.
 - Offers all, speaking, and academic perspectives without treating the item budget as a quota. Grammar inclusion remains a separate checkbox.
 - Sends the passage to the local server endpoint `POST /api/annotate`.
 - Keeps the API key on the server side.
 - Renders clickable vocabulary, phrases, idioms, grammar notes, slash reading, and exportable JSON/Markdown.
 - Separately analyzes how wording sounds and what a listener may infer, rather than treating pragmatic inference as dictionary meaning.
 - Covers evaluative nuance, stance, politeness, implicature, presupposition, register, irony, and euphemism.
-- Marks nuance spans directly in the text, places word-level nuance in the matching annotation card, and gives sentence-, utterance-, or passage-level nuance its own card.
+- Highlights the smallest useful anchor expression while preserving wider contrast and discourse conditions in the context and evidence fields.
 - Lets the learner switch nuance detail between brief, standard, and detailed without discarding the richer API result.
 
 ## Connotator Output
@@ -73,6 +74,8 @@ node scripts/evaluate_connotations.mjs --mode discovery --limit 2
 ```
 
 The full benchmark uses a separate model judgment for pragmatic accuracy and restraint. It is an AI screening test, not native-speaker certification.
+
+The model comparison and multilingual long-passage test are reproducible with `scripts/compare_connotation_models.mjs` and `scripts/evaluate_luna_long_multilingual.mjs`. The long-passage test covers Japanese, English, Chinese, Korean, Spanish, Turkish, and Arabic. It remains an AI screening test rather than native-speaker certification.
 
 ## YouTube Import
 

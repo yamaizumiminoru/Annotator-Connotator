@@ -16,6 +16,7 @@ const state = {
   uiLanguage: "ja",
   uiText: baseUiText.ja || {},
   inputMode: "text",
+  analysisMode: "standard",
 };
 
 const typeTextKeys = {
@@ -110,6 +111,9 @@ function init() {
   els.youtubeCorrect.checked = localStorage.getItem("annotation.youtubeCorrect") !== "false";
   const savedLevel = localStorage.getItem("annotation.level") || "intermediate";
   state.level = savedLevel === "academic" ? "advanced" : savedLevel;
+  state.analysisMode = localStorage.getItem("annotation.analysisMode") === "precise"
+    ? "precise"
+    : "standard";
 
   const savedDensity = localStorage.getItem("annotation.density");
   if (savedDensity) els.densityRange.value = savedDensity;
@@ -126,8 +130,14 @@ function init() {
   els.includeSlash.checked = localStorage.getItem("annotation.includeSlash") !== "false";
 
   document.querySelectorAll(".segment").forEach((button) => {
+    if (!button.dataset.level) return;
     button.classList.toggle("active", button.dataset.level === state.level);
     button.addEventListener("click", () => setLevel(button.dataset.level));
+  });
+
+  document.querySelectorAll(".analysis-mode-segment").forEach((button) => {
+    button.classList.toggle("active", button.dataset.analysisMode === state.analysisMode);
+    button.addEventListener("click", () => setAnalysisMode(button.dataset.analysisMode));
   });
 
   document.querySelectorAll(".tab").forEach((button) => {
@@ -298,10 +308,19 @@ function t(key, values = {}) {
 function setLevel(level) {
   state.level = level;
   document.querySelectorAll(".segment").forEach((button) => {
+    if (!button.dataset.level) return;
     button.classList.toggle("active", button.dataset.level === state.level);
   });
   persistSettings();
   updateStats();
+}
+
+function setAnalysisMode(mode) {
+  state.analysisMode = mode === "precise" ? "precise" : "standard";
+  document.querySelectorAll(".analysis-mode-segment").forEach((button) => {
+    button.classList.toggle("active", button.dataset.analysisMode === state.analysisMode);
+  });
+  persistSettings();
 }
 
 function persistSettings() {
@@ -310,6 +329,7 @@ function persistSettings() {
   localStorage.setItem("annotation.youtubeCorrect", String(els.youtubeCorrect.checked));
   localStorage.setItem("annotation.inputMode", state.inputMode);
   localStorage.setItem("annotation.level", state.level);
+  localStorage.setItem("annotation.analysisMode", state.analysisMode);
   localStorage.setItem("annotation.density", els.densityRange.value);
   localStorage.setItem("annotation.nuanceDetail", els.nuanceRange.value);
   localStorage.setItem("annotation.sourceLanguage", els.sourceLangSelect.value);
@@ -432,7 +452,11 @@ async function checkHealth() {
     if (!data.openaiConfigured) {
       setStatus(t("serverKeyNeeded"), "error");
     } else {
-      setStatus(t("modelReady", { model: data.model }), "ok");
+      const models = data.models || { standard: data.model, precise: data.model };
+      setStatus(t("modelsReady", {
+        standard: models.standard,
+        precise: models.precise,
+      }), "ok");
     }
   } catch {
     els.serverPill.textContent = "offline";
@@ -460,6 +484,7 @@ async function annotate() {
         sourceLanguage: els.sourceLangSelect.value,
         explanationLanguage: els.explanationLangSelect.value,
         uiLanguage: els.uiLangSelect.value,
+        analysisMode: state.analysisMode,
         level: state.level,
         density: Number(els.densityRange.value),
         focus: els.focusSelect.value,

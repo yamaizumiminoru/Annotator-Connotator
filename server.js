@@ -2,12 +2,14 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
+const packageJson = require("./package.json");
 
 const root = __dirname;
 loadDotEnv(path.join(root, ".env"));
 
 const port = Number(process.env.PORT || 4174);
-const model = process.env.OPENAI_MODEL || "gpt-5.6-sol";
+const standardModel = process.env.OPENAI_STANDARD_MODEL || "gpt-5.6-luna";
+const preciseModel = process.env.OPENAI_PRECISE_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-sol";
 const reasoningEffort = process.env.OPENAI_REASONING_EFFORT || "low";
 const textVerbosity = process.env.OPENAI_TEXT_VERBOSITY || "low";
 let youtubeTranscriptModulePromise;
@@ -87,13 +89,14 @@ function parseJsonObject(text) {
 }
 
 async function callOpenAI(input, maxOutputTokens, options = {}) {
+  const requestModel = options.model || standardModel;
   const body = {
-    model,
+    model: requestModel,
     input,
     max_output_tokens: maxOutputTokens,
   };
 
-  if (model.startsWith("gpt-5")) {
+  if (requestModel.startsWith("gpt-5")) {
     body.reasoning = { effort: reasoningEffort };
     body.text = { verbosity: textVerbosity };
   }
@@ -149,6 +152,62 @@ async function parseOrRepairJson(rawText, contextLabel) {
       throw error;
     }
   }
+}
+
+const unexpectedJapaneseTranslationScript = /[\p{Script=Armenian}\p{Script=Cyrillic}\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Hangul}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}\p{Script=Thai}\p{Script=Lao}\p{Script=Georgian}\p{Script=Ethiopic}\p{Script=Khmer}\p{Script=Myanmar}\p{Script=Mongolian}]/u;
+
+function needsJapaneseTranslationRepair(explanationLanguage, translation) {
+  const language = String(explanationLanguage || "ja").toLowerCase();
+  if (!new Set(["ja", "japanese", "日本語"]).has(language)) return false;
+  return unexpectedJapaneseTranslationScript.test(String(translation || ""));
+}
+
+async function repairJapaneseTranslation(sourceText, candidate, requestModel) {
+  let translation = String(candidate || "");
+  const usages = [];
+  for (let attempt = 0; attempt < 2 && needsJapaneseTranslationRepair("ja", translation); attempt += 1) {
+    const repaired = await callOpenAI([
+      {
+        role: "system",
+        content: [
+          "Return one JSON object with a translation property only.",
+          "Rewrite the candidate as a complete, faithful, natural Japanese translation of the source.",
+          "Remove accidental words or script from unrelated languages, including Cyrillic, Armenian, or Arabic-script substitutions.",
+          "Transliterate proper names naturally when needed. Do not omit any source content.",
+        ].join("\n"),
+      },
+      {
+        role: "user",
+        content: JSON.stringify({ sourceText, candidateTranslation: translation }),
+      },
+    ], 6000, { jsonObject: true, model: requestModel });
+    usages.push(repaired.usage || null);
+    const parsed = await parseOrRepairJson(extractText(repaired), "Japanese translation repair");
+    translation = String(parsed.translation || "").trim();
+  }
+  return { translation, usage: mergeUsage(usages) };
+}
+
+function mergeUsage(usages) {
+  return usages.filter(Boolean).reduce((totals, usage) => ({
+    input_tokens: totals.input_tokens + Number(usage.input_tokens || 0),
+    output_tokens: totals.output_tokens + Number(usage.output_tokens || 0),
+    total_tokens: totals.total_tokens + Number(usage.total_tokens || 0),
+    input_tokens_details: {
+      cached_tokens: totals.input_tokens_details.cached_tokens
+        + Number(usage.input_tokens_details?.cached_tokens || 0),
+    },
+    output_tokens_details: {
+      reasoning_tokens: totals.output_tokens_details.reasoning_tokens
+        + Number(usage.output_tokens_details?.reasoning_tokens || 0),
+    },
+  }), {
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
+    input_tokens_details: { cached_tokens: 0 },
+    output_tokens_details: { reasoning_tokens: 0 },
+  });
 }
 
 function levelPrompt(level) {
@@ -269,6 +328,7 @@ function buildAnnotationPrompt(payload) {
     `Source language: ${sourceLanguage}.`,
     `Explanation language: ${explanationLanguage}.`,
     `Write summaryJa, translation, meaningJa, and noteJa values in natural ${explanationLanguage}.`,
+    `Use only ${explanationLanguage} in explanatory prose. Quote source-language wording only when needed to identify or discuss it; never substitute an accidental word from an unrelated third language or script.`,
     "Keep the JSON property names exactly as specified even when the explanation language is not Japanese.",
     "",
     `Target level: ${levelPrompt(payload.level)}`,
@@ -304,10 +364,10 @@ function buildAnnotationPrompt(payload) {
     '  "connotations": [',
     "    {",
     '      "id": "c1",',
-    '      "text": "exact contiguous substring from sourceText",',
+    '      "text": "smallest exact contiguous substring suitable as the learner-facing highlight anchor",',
     '      "start": 0,',
     '      "end": 10,',
-    '      "scope": "span|sentence|utterance|passage",',
+    '      "scope": "span|sentence|utterance|passage; extent of the pragmatic effect, which may be wider than text",',
     '      "category": "evaluative|stance|politeness|implicature|presupposition|register|irony|euphemism",',
     '      "secondaryCategories": ["another applicable top-level category"],',
     '      "subtype": "specific subtype or unspecified",',
@@ -330,11 +390,23 @@ function buildAnnotationPrompt(payload) {
     "- Prefer useful learning targets over rare trivia.",
     "- Never pad the annotation list to reach the budget.",
     "- Treat the target level as a knowledge floor. Assume the learner already knows words and structures comfortably below that level, and omit them.",
+    "- Density changes the maximum number of useful items, never the difficulty threshold. Even at the highest density, omit material below the target level.",
     "- Each annotation must offer a concrete learning benefit at the selected target level. If noteJa cannot explain that benefit without stating an elementary dictionary fact, omit the annotation.",
     "- Do not annotate an elementary pronoun, article, simple copula, punctuation mark, or isolated function word unless it is genuinely difficult at the target level or participates in a larger construction worth explaining.",
     "- Prefer the complete reusable phrase or construction over a trivial single word contained inside it.",
     "- Do not annotate overlapping spans.",
-    "- Connotations may overlap annotations and may use a whole sentence, utterance, or passage as their exact source span.",
+    "- Connotations may overlap ordinary annotations.",
+    "- For each connotation, text/start/end identify the smallest contiguous wording that gives the learner a useful place to focus. Treat this as a UI highlight anchor, not as a context window or a claim that the nuance is encoded by that substring alone.",
+    "- Each connotation card must have one primary learner-facing anchor. If a word or short phrase supplies the evaluative, register, stance, presuppositional, euphemistic, polite, or ironic cue, highlight that word or phrase even when the complete interpretation is constructed by later context, contrast, cancellation, or clarification.",
+    "- Before returning a connotation, test whether removing words from either edge would still identify the same linguistic trigger. If so, shorten the span.",
+    "- Do not enlarge text merely to include evidence, contrast, consequences, or explanatory context. Put those clues in evidence and explain their role in contextNote.",
+    "- When the nuance depends on a contrast or wider discourse, explicitly say so in contextNote and set conventionality to contextual or mixed as appropriate. A narrow highlight must not be described as semantically sufficient on its own.",
+    "- When non-contiguous wording creates a contrast, never bridge the intervening text to make one large highlight. Return separate narrow connotations for independently useful triggers, or select the single most informative trigger and describe the contrast as evidence.",
+    "- Use scope to record how widely the pragmatic effect operates. A short trigger may therefore have sentence, utterance, or passage scope.",
+    "- Use a whole sentence, utterance, or passage as text only when no shorter contiguous expression anchors the effect, such as a genuinely construction-wide or discourse-wide phenomenon.",
+    "- When separate expressions independently contribute distinct useful nuances, return separate connotations instead of combining them into one broad span.",
+    "- For contextual irony, highlight the ironic expression itself and cite the conflicting context in evidence; do not include the setup merely to make the irony visible.",
+    "- Examples of span selection: highlight 'childish' rather than the full sentence that positively reframes it; highlight 'kids' and optionally 'children' rather than the full sentence contrasting their registers; highlight 'Great job' rather than the preceding failure that makes it ironic.",
     "- Add only connotations that are useful to a learner and supported by the wording or context.",
     "- Return an empty connotations array when there is no grounded nuance to explain.",
     "- Do not relabel ordinary dictionary meaning, lexical entailment, or a routine real-world association as connotation.",
@@ -350,10 +422,12 @@ function buildAnnotationPrompt(payload) {
     "- Include a faithful full-passage translation in translation.",
     "- Do not let the full translation replace the individual annotations.",
     "- Keep noteJa concise.",
+    `- Before returning, check translation, summaryJa, meaningJa, noteJa, and all connotation explanations for accidental words or script from a language other than ${explanationLanguage}.`,
     "- If the source language is auto-detected, set sourceLanguage to the detected language.",
     ...(connotationTargets.length
       ? [
           "- This is an explanation test. Analyze every supplied connotation target even if it would not normally be selected.",
+          "- For each supplied target, preserve its exact text/start/end as the connotation highlight. Use surrounding wording only as evidence or context.",
           `- Supplied connotation targets: ${JSON.stringify(connotationTargets)}`,
         ]
       : []),
@@ -398,6 +472,8 @@ async function handleAnnotate(req, res) {
   }
 
   const text = String(payload.text).trim();
+  const analysisMode = payload.analysisMode === "precise" ? "precise" : "standard";
+  const annotationModel = analysisMode === "precise" ? preciseModel : standardModel;
 
   try {
     const data = await callOpenAI([
@@ -410,20 +486,31 @@ async function handleAnnotate(req, res) {
           explanationLanguage: payload.explanationLanguage || "ja",
         }, null, 2),
       },
-    ], 13000, { jsonObject: true });
+    ], 13000, { jsonObject: true, model: annotationModel });
 
     const parsed = await parseOrRepairJson(extractText(data), "annotation result");
-    parsed.sourceText = parsed.sourceText || text;
+    parsed.sourceText = text;
     parsed.annotations = filterLowValueAnnotations(
-      repairAnnotationOffsets(parsed.sourceText, parsed.annotations),
+      repairAnnotationOffsets(text, parsed.annotations),
       payload.level,
       parsed.sourceLanguage || payload.sourceLanguage,
     );
-    parsed.connotations = normalizeConnotations(parsed.sourceText, parsed.connotations);
+    parsed.connotations = normalizeConnotations(text, parsed.connotations);
     parsed.sourceLanguage = parsed.sourceLanguage || payload.sourceLanguage || "auto";
     parsed.explanationLanguage = parsed.explanationLanguage || payload.explanationLanguage || "ja";
     parsed.translation = parsed.translation || "";
     parsed.level = payload.level || parsed.level || "intermediate";
+    let usage = data.usage || null;
+    if (needsJapaneseTranslationRepair(parsed.explanationLanguage, parsed.translation)) {
+      const repaired = await repairJapaneseTranslation(text, parsed.translation, annotationModel);
+      parsed.translation = repaired.translation;
+      usage = mergeUsage([usage, repaired.usage]);
+    }
+    parsed._api = {
+      model: annotationModel,
+      analysisMode,
+      usage,
+    };
     sendJson(res, 200, parsed);
   } catch (error) {
     sendJson(res, 502, {
@@ -718,7 +805,7 @@ function repairAnnotationOffsets(sourceText, annotations) {
 
   return annotations.map((item) => {
     const annotationText = String(item?.text || "");
-    if (!annotationText) return item;
+    if (!annotationText) return null;
 
     const candidates = [];
     if (Number.isInteger(item.start) && Number.isInteger(item.end)) {
@@ -737,8 +824,8 @@ function repairAnnotationOffsets(sourceText, annotations) {
       occupied.push({ start, end });
       return { ...item, start, end };
     }
-    return item;
-  });
+    return null;
+  }).filter(Boolean);
 }
 
 async function handleUiTranslations(req, res) {
@@ -827,8 +914,14 @@ const server = http.createServer(async (req, res) => {
   if (req.url.startsWith("/api/health") && req.method === "GET") {
     sendJson(res, 200, {
       ok: true,
+      app: packageJson.name,
+      version: packageJson.version,
       openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
-      model,
+      model: standardModel,
+      models: {
+        standard: standardModel,
+        precise: preciseModel,
+      },
     });
     return;
   }
@@ -853,5 +946,9 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, () => {
   console.log(`Annotator-Connotator: http://localhost:${port}`);
-  console.log(process.env.OPENAI_API_KEY ? `LLM enabled with ${model}` : "OPENAI_API_KEY is not set.");
+  console.log(
+    process.env.OPENAI_API_KEY
+      ? `LLM enabled: standard=${standardModel}, precise=${preciseModel}`
+      : "OPENAI_API_KEY is not set.",
+  );
 });

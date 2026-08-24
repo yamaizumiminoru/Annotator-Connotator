@@ -48,10 +48,14 @@ function Get-NodePath {
   throw "node.exe was not found. Install Node.js or start the app from Codex."
 }
 
-function Test-AppHealth($Url) {
+function Test-AppHealth($Url, $ExpectedVersion) {
   try {
     $response = Invoke-RestMethod -Uri $Url -Method Get -TimeoutSec 2
-    return ($response.ok -eq $true)
+    return (
+      $response.ok -eq $true -and
+      $response.app -eq "annotator-connotator" -and
+      $response.version -eq $ExpectedVersion
+    )
   } catch {
     return $false
   }
@@ -59,10 +63,12 @@ function Test-AppHealth($Url) {
 
 $port = [int](Read-EnvValue "PORT" "4174")
 $healthUrl = "http://localhost:$port/api/health"
-$appUrl = "http://localhost:$port"
 $pidPath = Join-Path $AppDir "server.pid"
+$packagePath = Join-Path $AppDir "package.json"
+$expectedVersion = (Get-Content -LiteralPath $packagePath -Raw | ConvertFrom-Json).version
+$appUrl = "http://localhost:$port/?v=$expectedVersion"
 
-if (Test-AppHealth $healthUrl) {
+if (Test-AppHealth $healthUrl $expectedVersion) {
   Write-Host "Annotator-Connotator is already running: $appUrl"
 } else {
   $node = Get-NodePath
@@ -96,7 +102,7 @@ if (Test-AppHealth $healthUrl) {
   $ready = $false
   for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Milliseconds 300
-    if (Test-AppHealth $healthUrl) {
+    if (Test-AppHealth $healthUrl $expectedVersion) {
       $ready = $true
       break
     }

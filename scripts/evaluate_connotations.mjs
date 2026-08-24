@@ -54,11 +54,12 @@ if (!noJudge && !process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is required unless --no-judge is used.");
 }
 
-await assertAppReady();
+const appHealth = await assertAppReady();
 const output = {
   generatedAt: new Date().toISOString(),
   appUrl,
-  model: noJudge ? null : model,
+  appModel: appHealth.model || null,
+  judgeModel: noJudge ? null : model,
   benchmarkVersion: benchmark.version,
   requestedMode,
   records: [],
@@ -68,10 +69,21 @@ const output = {
 for (let index = 0; index < work.length; index += 1) {
   const { testCase, mode } = work[index];
   console.log(`[${index + 1}/${work.length}] ${testCase.id} (${mode})`);
+  const appStartedAt = performance.now();
   const annotation = await callApp(testCase, mode);
+  const appElapsedMs = Math.round(performance.now() - appStartedAt);
   const structure = inspectStructure(testCase, annotation);
+  const judgeStartedAt = performance.now();
   const judgment = noJudge ? null : await judgeResult(testCase, mode, annotation, structure);
-  output.records.push({ testCase, mode, annotation, structure, judgment });
+  const judgeElapsedMs = noJudge ? 0 : Math.round(performance.now() - judgeStartedAt);
+  output.records.push({
+    testCase,
+    mode,
+    annotation,
+    structure,
+    judgment,
+    timing: { appElapsedMs, judgeElapsedMs },
+  });
   output.summary = summarize(output.records);
   fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
 }
@@ -138,6 +150,7 @@ async function assertAppReady() {
   if (!response.ok) throw new Error(`App health check failed (${response.status}).`);
   const health = await response.json();
   if (!health.openaiConfigured) throw new Error("The app server does not have an OpenAI API key configured.");
+  return health;
 }
 
 async function callApp(testCase, mode) {
@@ -157,7 +170,6 @@ async function callApp(testCase, mode) {
       text: testCase.targetText,
       start: targetStart,
       end: targetStart + testCase.targetText.length,
-      category: testCase.category,
     }];
   }
 
@@ -229,7 +241,9 @@ async function judgeResult(testCase, mode, annotation, structure) {
     `Score fields: ${scoreSchema}.`,
     "Use the supplied expected required ideas as semantic criteria, not as wording that must be copied.",
     "For discovery, award discovery points only when the app independently finds the target; for shouldDetect=false, award them for appropriate abstention.",
-    "Span checks exact renderability and useful scope. Use the supplied structural report.",
+    "Span checks exact renderability and learner-facing highlight quality. Use the supplied structural report.",
+    "For discovery span scoring, prefer the smallest useful anchor expression. Lower the span score when the app highlights a whole sentence merely to include contrast or context although a word or phrase can anchor the card.",
+    "Do not penalize a narrow highlight when contextNote and evidence correctly explain that the interpretation depends on wider contrast or discourse.",
     "Context sensitivity requires distinguishing conventional meaning from contextual inference and preserving cancellation or contrast.",
     "Restraint requires avoiding the forbidden claims and unsupported hostility, irony, discrimination, emotion, personality, or certainty.",
     "A pattern=negative case is a category-specific negative control. Set negativeControlError true if the app invents the tested category or a forbidden reading, even if another grounded category is acceptable.",
@@ -237,7 +251,8 @@ async function judgeResult(testCase, mode, annotation, structure) {
     `Schema: {scores:{${scoreSchema}},totalScore:number,criticalError:boolean,negativeControlError:boolean,pass:boolean,reason:string,issues:string[]}`,
     `A case passes at 80% of ${maximum} with no critical error.`,
   ].join("\n");
-  const payload = { testCase, annotation, structure };
+  const { _api, ...judgedAnnotation } = annotation;
+  const payload = { testCase, annotation: judgedAnnotation, structure };
   return withRetry(() => callOpenAI([
     { role: "system", content: system },
     { role: "user", content: JSON.stringify(payload) },
@@ -263,7 +278,13 @@ async function callOpenAI(input, maxOutputTokens) {
   if (!response.ok) {
     throw new Error(`Judge request failed (${response.status}): ${(await response.text()).slice(0, 500)}`);
   }
-  return parseJson(extractText(await response.json()));
+  const data = await response.json();
+  const parsed = parseJson(extractText(data));
+  parsed._api = {
+    model,
+    usage: data.usage || null,
+  };
+  return parsed;
 }
 
 async function withRetry(action) {
@@ -308,9 +329,52 @@ function summarize(records) {
   return {
     completed: records.length,
     structuralFailures: records.filter((record) => !record.structure.pass).length,
+    usage: {
+      app: summarizeUsage(records.map((record) => record.annotation?._api?.usage)),
+      judge: summarizeUsage(records.map((record) => record.judgment?._api?.usage)),
+    },
+    timing: {
+      app: summarizeTiming(records.map((record) => record.timing?.appElapsedMs)),
+      judge: summarizeTiming(records.map((record) => record.timing?.judgeElapsedMs)),
+    },
     discovery: summarizeMode(discovery, 10),
     explanation: summarizeMode(explanation, 8),
   };
+}
+
+function summarizeTiming(values) {
+  const timings = values.filter((value) => Number.isFinite(value) && value >= 0);
+  if (!timings.length) return { requests: 0, averageMs: 0, medianMs: 0, totalMs: 0 };
+  const sorted = [...timings].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2
+    ? sorted[middle]
+    : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+  const total = timings.reduce((sum, value) => sum + value, 0);
+  return {
+    requests: timings.length,
+    averageMs: Math.round(total / timings.length),
+    medianMs: median,
+    totalMs: total,
+  };
+}
+
+function summarizeUsage(usages) {
+  return usages.filter(Boolean).reduce((totals, usage) => ({
+    requests: totals.requests + 1,
+    inputTokens: totals.inputTokens + Number(usage.input_tokens || 0),
+    cachedInputTokens: totals.cachedInputTokens + Number(usage.input_tokens_details?.cached_tokens || 0),
+    outputTokens: totals.outputTokens + Number(usage.output_tokens || 0),
+    reasoningTokens: totals.reasoningTokens + Number(usage.output_tokens_details?.reasoning_tokens || 0),
+    totalTokens: totals.totalTokens + Number(usage.total_tokens || 0),
+  }), {
+    requests: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    totalTokens: 0,
+  });
 }
 
 function summarizeMode(records, maximum) {

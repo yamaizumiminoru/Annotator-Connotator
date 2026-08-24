@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "ja-user-essay",
+      "language": "ja",
+      "name": "Japanese",
+      "source": "User-provided original sample",
+      "sourceText": "大学に入ったら、専門性・個性・学識を身に付けたい！ そんなあなたには、外国語学部で外国語を学ぶのに加えて、私みたいに日本語を研究することをオススメします！\n研究とは、人類の知を広げる活動です。既に誰かが明らかにしたことを学ぶのは、勉強（自分の知を広げること）であって、研究ではありません。まだ誰も明らかにしていないことを明らかにする――これほど明確な専門性と個性があるでしょうか。もちろん、人類の最先端に行くには、それまで明らかになっていることを勉強する必要があり、研究できるほどの知識は立派な学識と言えます。つまり、研究をすれば、専門性も個性も学識も自然に身に付くということです。人類にも貢献できます。\n何を研究すればいいかって？ 外国語学部で学ぶ外国語でもいいですが、その言語が相当できるようになる必要があります。それを待っていられなかったら、まずは長年学んできた日本語を研究しましょう。街中で、そして、あなたの頭の中でも、日本語はあなたに解明されるのを待っています。",
+      "expectedSignals": [
+        "direct recommendation and encouraging address to the reader",
+        "rhetorical questions",
+        "conversational framing",
+        "personification in the final sentence"
+      ]
+    },
+    {
+      "id": "en-unesco-multilingual",
+      "language": "en",
+      "name": "English",
+      "source": "https://www.unesco.org/en/articles/multilingual-education-key-quality-and-inclusive-learning?hub=343",
+      "sourceText": "Language is more than a tool for communication; it is a very specific human cognitive faculty and the foundation of our shared humanity. It enables the transmission of experiences, traditions, knowledge and identities across generations. Languages play a crucial role in promoting peace, fostering intercultural dialogue and driving sustainable development. They permeate every facet of our lives, from family and work to education, politics, media, justice, research and technology. Our values, beliefs, knowledge, identities and worldviews are intricately shaped by language, reflecting the richness of the human experience.\nBut languages are under significant threat. UNESCO data indicates that around 600 languages have disappeared in the last century. International Mother Language Day underscores the urgent need to champion linguistic diversity and multilingual education rooted in mother tongues. The potential of multilingual education is enormous, but realizing its full benefits requires a commitment to lifelong learning and a deeper appreciation of the value of linguistic diversity.",
+      "expectedSignals": [
+        "metaphorical framing of language as a foundation",
+        "strong evaluative and urgent advocacy language",
+        "contrast introduced by But",
+        "formal institutional register"
+      ]
+    },
+    {
+      "id": "zh-unesco-identity",
+      "language": "zh",
+      "name": "Chinese",
+      "source": "https://www.unesco.org/zh/articles/muyu-ningjudeliliang",
+      "sourceText": "他们说需要一个村庄来养育一个孩子，但我的成长却体验了不同文化的冲突。我出生在萨摩亚，一直沉浸在她丰富的文化和传统中，我对自己的家乡、以及让我很有归属感的更广阔的本民族社区充满自豪。然而从我离开家乡去上学开始，一切似乎都变了。我很快发现我是学校里的少数民族，而且大多数人对我的族人怀着非常负面的看法。他们嘲笑我的说话方式，他们排挤我，仅仅是因为我与他们不同。为了融入，我尝试做过一些调整，对此今天的我不会感到自豪。为了让别人喜欢我，我必须表现得不那么萨摩亚。\n十多年之后我才意识到，我在放弃数千年积淀的传统和身份，去换取仅仅几年的校园融入。强大的暴民语言淹没了我自己的声音。显然，语言就像一把双刃剑，它可以把我们分割开，正如它能将我们凝聚在一起一样。当大多数人说着与我不同的语言时，我感觉自己很弱势，不能与他人平等地对话。优势语言迫使我放弃自己的语言。\n好在我是幸运的，现在我过着双重的生活。我既不是萨摩亚人，也不是新西兰人，我是两者的合体，这也是我的荣光！社会有时会愚弄你，让你在二个选项之间择其一。",
+      "expectedSignals": [
+        "personal evaluative stance and identity conflict",
+        "double-edged sword metaphor",
+        "contrastive and concessive discourse markers",
+        "emotionally charged wording without inventing extra hostility"
+      ]
+    },
+    {
+      "id": "ko-korea-kpop",
+      "language": "ko",
+      "name": "Korean",
+      "source": "https://www.korea.net/NewsFocus/Culture/view?articleId=296864&koreanId=295372",
+      "sourceText": "한국 문화(K-컬처)는 일시적 열풍을 넘어 지구촌의 일상이 됐다. 코리아넷은 5회에 걸쳐 한국 음악·영화·음식·뷰티·문학 등 전방위로 확장한 K-콘텐츠의 인기 요인을 분석한다. 현상 진단을 넘어 지속 가능한 한류 미래와 구체적 생존 전략을 모색한다.\n사실 K-팝이 세계 음악 시장에서 거둔 성과는 일일이 나열하기 어려울 정도다. 빌보드와 스포티파이 등 글로벌 음악 차트 정상에 오르는 것은 더 이상 놀라운 소식이 아니라 자연스러운 일상이 됐다. K-팝은 이제 소수의 사람들만 듣는 음악이 아니다. 국경과 언어를 넘어 전 세계 사람들이 함께 즐기는 하나의 문화로 자리 잡았다. 그렇다면 K-팝은 어떻게 세계인의 마음을 사로잡을 수 있었을까?\n김태룡 교수는 무엇보다 K-팝이 서구 대중문화를 넘어서는 대안적 문화로 자리매김했다는 점이 가장 중요한 요인이라고 분석했다. 그러면서 K-팝은 전 세계 팬들이 자신의 정체성을 새롭게 구성하고 다양한 문화와 연결하는 문화적 플랫폼이 됐다고 강조했다.",
+      "expectedSignals": [
+        "claims that K-pop has moved beyond a temporary trend",
+        "rhetorical question",
+        "metaphorical expression about capturing hearts",
+        "reported expert stance and emphasis"
+      ]
+    },
+    {
+      "id": "es-unesco-inclusion",
+      "language": "es",
+      "name": "Spanish",
+      "source": "https://www.unesco.org/es/articles/lengua-materna-pilar-de-la-inclusion",
+      "sourceText": "En el marco del Decenio de Lenguas Indígenas, se reafirma la importancia de preservar y promover los derechos de las comunidades indígenas en todo el mundo. Estas comunidades no solo son guardianes de los recursos naturales, sino también portadores de conocimientos, habilidades y visiones del mundo excepcionales. Los idiomas, como conductos del patrimonio cultural, son fundamentales para la identidad humana, permitiendo la transmisión de culturas, expresiones y filosofías de vida únicas.\nPara preservar una lengua, es crucial implementar políticas lingüísticas bien planificadas que motiven a los gobiernos a enseñarlas en las escuelas y reconocerlas oficialmente. Este proceso no es inevitable ni irreversible; con un esfuerzo coordinado, se pueden revitalizar las lenguas maternas y asegurar su transmisión a las generaciones futuras. Guatemala, reconocida como un Estado multicultural y plurilingüe, debe garantizar la conservación de sus diversas culturas, costumbres e idiomas a través de la educación bilingüe intercultural.\nLa enseñanza en la lengua materna no solo facilita el aprendizaje, sino que también mejora la comprensión, la interacción y el pensamiento crítico. Además, contribuye a la preservación de la cultura y el patrimonio inmaterial, promoviendo una educación más inclusiva y con pertinencia cultural.",
+      "expectedSignals": [
+        "not only but also emphasis",
+        "metaphorical framing as guardians and conduits",
+        "strong policy recommendation and obligation",
+        "formal advocacy register"
+      ]
+    },
+    {
+      "id": "tr-culture-history",
+      "language": "tr",
+      "name": "Turkish",
+      "source": "https://www.kulturportali.gov.tr/portal/turkler-ve-turkce",
+      "sourceText": "Türk dilinin ilk izlerine Sümer kaynaklarında rastlanmaktadır. İki dil arasında 168 ortak kelime tespit edilmiş ve Türklerin en az M.Ö. 3500'lerde Türkiye'nin doğu bölgesinde bulunduğu ileri sürülmüştür. Hunlardan kalan birkaç kelimelik malzeme bir kenara bırakılırsa, Moğolistan'da bulunmuş olan altı satırlık Çoyr yazıtı Türkçenin tarihi bilinen en eski metnidir. Köktürklerden kalan Türkçe anıtlar İkinci Köktürk dönemine aittir. En ünlüleri Köl Tigin, Bilge Kağan ve Tonyukuk'tur.\nYedinci ve onuncu yüzyıllar arasında Türkçe, Macaristan'dan Güney Sibirya'ya ve Moğolistan içlerine kadar uzanan sahada Göktürk harfleriyle yazılan bir yazılı dil olarak kullanılmıştır. Yazıtlar, Moğolistan'dan sonra en yaygın olarak Güney Sibirya'da Yenisey ve kollarının suladığı alanlarda bulunmaktadır. Köktürklerden sonra gelen Uygurlar, dokuzuncu yüzyıldan itibaren Tarım havzasında ve Gansu bölgesinde Göktürk, Uygur, Soğdak ve Brahmi alfabeleriyle eserler meydana getirmişlerdir.",
+      "expectedSignals": [
+        "formal historical register",
+        "reported or evidential caution rather than certainty",
+        "conditional framing that sets aside limited evidence",
+        "no invented interpersonal connotation"
+      ]
+    },
+    {
+      "id": "ar-unesco-language",
+      "language": "ar",
+      "name": "Arabic",
+      "source": "https://www.unesco.org/ar/articles/alywnskw-thtfy-btrath-allght-alrbyt-wtslt-aldw-ly-dwrha-fy-rsm-mlamh-almarf-aljdydt",
+      "sourceText": "تعتبر اللغة ركيزة أساسية لأي مجتمع، وهي القوة الدافعة التي تربط المجتمعات والجماعات ببعضها البعض. وتؤدي اللغة العربية دور الحاضنة للثقافة والعلوم والمعرفة باعتبارها إحدى اللغات الرسمية الست في الأمم المتحدة، وإحدى أكثر اللغات انتشاراً على مستوى العالم، وكان للغة العربية دور أساسي لعدة قرون كمصدرٍ للمعارف والقيم.\nنظَّمت اليونسكو اجتماعاً إقليمياً بعنوان «اللغة العربية، ما وراء الموروث» في مدينة الرباط بالمغرب، تقديراً لإرث اللغة العربية وحاضرها ومستقبلها. وأكدت هذه الفعالية على المكانة البارزة للغة العربية في رسم ملامح المعارف الجديدة في مختلف أنحاء العالم وتعزيز الحوار والتفاهم المتبادل. وشددت مساعدة المديرة العامة للعلوم الاجتماعية والإنسانية في اليونسكو على أن اللغة العربية منفذ للتفاهم بطريقة أفضل.\nلا يكفي أن نحافظ على موروث اللغة العربية؛ يجب أن نستمد الإلهام من هذا الموروث من أجل بناء مستقبل أفضل. وقدمت الفعالية فرصة للخبراء والأكاديميين والفنانين والشباب للتفكير والحوار بشأن النتائج والإنجازات الرئيسية للمبادرات المعنية باللغة العربية.",
+      "expectedSignals": [
+        "metaphorical framing of language as foundation, force, and incubator",
+        "formal institutional register",
+        "evaluative emphasis",
+        "contrast between preserving heritage and drawing inspiration for the future"
+      ]
+    }
+  ]
+}

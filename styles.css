@@ -240,6 +240,10 @@ input:focus {
   overflow: hidden;
 }
 
+.model-segmented {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .segment,
 .tab,
 .ghost-btn,

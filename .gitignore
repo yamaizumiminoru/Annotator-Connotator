@@ -6,3 +6,4 @@ legacy-language-evaluation-*.json
 connotation-evaluation-*.json
 node_modules/
 .npm-cache/
+tmp/
