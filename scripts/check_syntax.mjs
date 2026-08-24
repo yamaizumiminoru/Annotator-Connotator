@@ -8,6 +8,7 @@ const files = [
   "server.js",
   "script.js",
   "client-analysis.js",
+  "client-session.js",
   "card-presentation.js",
   ...fs.readdirSync(path.join(root, "lib"))
     .filter((name) => name.endsWith(".js"))
