@@ -716,6 +716,8 @@ async function analyzePayload({ payload, text, signal, onProgress }) {
       chunks,
       signal,
       onProgress,
+      maxAttempts: 2,
+      retryDelayMs: 5_000,
       analyzeChunk: async (chunk, index, total) => {
         const analyzed = await analyzeSingleText({
           text: chunk.text,

@@ -159,3 +159,50 @@ test("partial failure is explicit and retains usage from completed chunks", asyn
   });
   assert.equal(calls, 2);
 });
+
+test("a transient section failure can be retried without repeating completed sections", async () => {
+  const calls = [];
+  const progress = [];
+  const result = await runChunkPipeline({
+    chunks: [{ index: 0 }, { index: 1 }, { index: 2 }],
+    maxAttempts: 2,
+    analyzeChunk: async (chunk) => {
+      calls.push(chunk.index);
+      if (chunk.index === 1 && calls.filter((index) => index === 1).length === 1) {
+        throw new Error("temporary model failure");
+      }
+      return { chunk, usage: { total_tokens: 1 } };
+    },
+    onProgress: (event) => progress.push(event),
+  });
+
+  assert.deepEqual(calls, [0, 1, 1, 2]);
+  assert.deepEqual(result.map((item) => item.chunk.index), [0, 1, 2]);
+  assert.deepEqual(progress.find((event) => event.stage === "retrying"), {
+    stage: "retrying",
+    current: 2,
+    total: 3,
+    attempt: 2,
+  });
+});
+
+test("cancellation during a retry delay prevents another model call", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  await assert.rejects(runChunkPipeline({
+    chunks: [{ index: 0 }],
+    signal: controller.signal,
+    maxAttempts: 2,
+    retryDelayMs: 100,
+    analyzeChunk: async () => {
+      calls += 1;
+      setTimeout(() => controller.abort(), 5);
+      throw new Error("temporary model failure");
+    },
+  }), (error) => {
+    assert.ok(error instanceof AnalysisCancelledError);
+    assert.equal(error.completedChunks, 0);
+    return true;
+  });
+  assert.equal(calls, 1);
+});
