@@ -82,8 +82,8 @@ test("density selection reuses one ranked candidate pool monotonically", () => {
   const standard = selectCandidatesByDensity(candidates, 2).map((item) => item.id);
   const high = selectCandidatesByDensity(candidates, 3).map((item) => item.id);
 
-  assert.deepEqual(new Set(low).intersection(new Set(standard)), new Set(low));
-  assert.deepEqual(new Set(standard).intersection(new Set(high)), new Set(standard));
+  assert.ok(low.every((id) => standard.includes(id)));
+  assert.ok(standard.every((id) => high.includes(id)));
   assert.equal(low.length, 2);
   assert.equal(standard.length, 4);
   assert.equal(high.length, 5);
