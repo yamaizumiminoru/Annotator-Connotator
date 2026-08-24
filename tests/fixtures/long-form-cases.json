@@ -1,0 +1,18 @@
+{
+  "english": {
+    "repeat": 70,
+    "sections": [
+      "In this lecture we examine how children build a linguistic system from ordinary conversation. The central question is not whether children imitate adults, but how repeated interactions support durable generalizations. We will compare diary observations, controlled experiments, and longitudinal corpora while keeping the limits of each source of evidence in view.",
+      "A transcript records more than isolated words. Turn taking, repair, hesitation, and the timing of a caregiver response can change how an utterance should be interpreted. Researchers therefore preserve local context, distinguish observation from inference, and document decisions that later analysts may need to revisit.",
+      "The final section considers multilingual development. A child may distribute vocabulary across languages, adapt choices to different speakers, and draw on several linguistic resources in one activity. Describing that behavior accurately requires measures that do not treat monolingual performance as the only possible norm."
+    ]
+  },
+  "japanese": {
+    "repeat": 170,
+    "sections": [
+      "この講義では、会話資料を使って言語習得を研究する方法を考える。発話を単語の列として扱うだけでは、話者交替、言い直し、沈黙が担う働きを見落としてしまう。そこで、文字起こしと音声を対応させ、判断の根拠を後から確かめられるようにする。",
+      "複数の言語を使う学習者を分析するとき、一つの言語だけで測った語彙量をその人の知識全体とみなすことはできない。相手や場面による選択の違いを記録し、どの資料から何が言えるのかを区別する必要がある。",
+      "最後に、研究結果を教材へ応用する際の注意点を検討する。頻度が高い表現でも学習者にとって難しい場合があり、珍しい語を多く示せばよいわけでもない。文章全体を見渡し、学習段階に合う対象を優先して選ぶことが重要になる。"
+    ]
+  }
+}

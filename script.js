@@ -5,6 +5,8 @@ const sampleText = `大学に入ったら、専門性・個性・学識を身に
 const languageCatalog = window.LANGUAGE_CATALOG || [];
 const baseUiText = window.UI_TEXT || {};
 const cardPresentation = window.CARD_PRESENTATION;
+const analysisCore = window.ANALYSIS_CORE;
+const clientAnalysis = window.CLIENT_ANALYSIS;
 const uiTextCacheVersion = "5";
 
 const state = {
@@ -18,6 +20,7 @@ const state = {
   uiText: baseUiText.ja || {},
   inputMode: "text",
   analysisMode: "standard",
+  analysisController: null,
 };
 
 const typeTextKeys = {
@@ -76,6 +79,7 @@ const els = {
   includeGrammar: document.getElementById("includeGrammar"),
   includeSlash: document.getElementById("includeSlash"),
   annotateBtn: document.getElementById("annotateBtn"),
+  cancelAnalyzeBtn: document.getElementById("cancelAnalyzeBtn"),
   sampleBtn: document.getElementById("sampleBtn"),
   clearBtn: document.getElementById("clearBtn"),
   statusBox: document.getElementById("statusBox"),
@@ -169,6 +173,7 @@ function init() {
   els.includeGrammar.addEventListener("change", persistSettings);
   els.includeSlash.addEventListener("change", persistSettings);
   els.annotateBtn.addEventListener("click", annotate);
+  els.cancelAnalyzeBtn.addEventListener("click", cancelAnalysis);
   els.sampleBtn.addEventListener("click", loadSample);
   els.clearBtn.addEventListener("click", clearAll);
   els.copyJsonBtn.addEventListener("click", copyJson);
@@ -478,13 +483,17 @@ async function annotate() {
     return;
   }
   persistSettings();
+  const controller = new AbortController();
+  state.analysisController = controller;
   setBusy(true);
   setStatus(t("analyzingStatus"), "");
 
   try {
+    const useProgressStream = text.length > analysisCore.LONG_FORM_THRESHOLD;
     const response = await fetch("/api/annotate", {
       method: "POST",
       headers: { "content-type": "application/json" },
+      signal: controller.signal,
       body: JSON.stringify({
         text,
         sourceLanguage: els.sourceLangSelect.value,
@@ -496,13 +505,27 @@ async function annotate() {
         focus: els.focusSelect.value,
         includeGrammar: els.includeGrammar.checked,
         includeSlash: els.includeSlash.checked,
+        streamProgress: useProgressStream,
       }),
     });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      if (data.error === "missing_api_key") throw new Error(t("apiKeyRequired"));
-      throw new Error(data.message || data.error || "annotation failed");
+    let data;
+    if (response.headers.get("content-type")?.includes("application/x-ndjson")) {
+      data = await clientAnalysis.readProgressResponse(response, (progress) => {
+        if (progress.stage === "merging") {
+          setStatus(t("mergingSections"), "");
+        } else {
+          setStatus(t("analyzingChunk", { current: progress.current, total: progress.total }), "");
+        }
+      });
+    } else {
+      data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (data.error === "missing_api_key") throw new Error(t("apiKeyRequired"));
+        const requestError = new Error(data.message || data.error || "annotation failed");
+        Object.assign(requestError, data);
+        throw requestError;
+      }
     }
 
     state.result = normalizeResult(data, text);
@@ -513,10 +536,29 @@ async function annotate() {
     }), "ok");
     showTab("annotated");
   } catch (error) {
-    setStatus(String(error.message || error), "error");
+    if (clientAnalysis.isCancellation(error, controller.signal)) {
+      setStatus(t("analysisCancelled"), "");
+    } else if (error.error === "long_form_partial_failure") {
+      setStatus(t("analysisPartialFailure", {
+        completed: error.completedChunks || 0,
+        total: error.totalChunks || "?",
+      }), "error");
+    } else {
+      setStatus(String(error.message || error), "error");
+    }
   } finally {
-    setBusy(false);
+    if (state.analysisController === controller) {
+      state.analysisController = null;
+      setBusy(false);
+    }
   }
+}
+
+function cancelAnalysis() {
+  if (!state.analysisController) return;
+  els.cancelAnalyzeBtn.disabled = true;
+  setStatus(t("analysisCancelling"), "");
+  state.analysisController.abort();
 }
 
 function normalizeResult(data, fallbackText) {
@@ -1073,6 +1115,20 @@ function showTab(name) {
 
 function setBusy(isBusy) {
   els.annotateBtn.disabled = isBusy;
+  els.cancelAnalyzeBtn.hidden = !isBusy;
+  els.cancelAnalyzeBtn.disabled = false;
+  els.sampleBtn.disabled = isBusy;
+  els.clearBtn.disabled = isBusy;
+  els.sourceText.disabled = isBusy;
+  els.sourceLangSelect.disabled = isBusy;
+  els.explanationLangSelect.disabled = isBusy;
+  els.densityRange.disabled = isBusy;
+  els.focusSelect.disabled = isBusy;
+  els.includeGrammar.disabled = isBusy;
+  els.includeSlash.disabled = isBusy;
+  document.querySelectorAll(".segment, .analysis-mode-segment").forEach((button) => {
+    button.disabled = isBusy;
+  });
   const label = els.annotateBtn.querySelector("[data-i18n]");
   if (label) label.textContent = isBusy ? t("analyzing") : t("analyze");
 }

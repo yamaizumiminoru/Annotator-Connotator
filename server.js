@@ -14,11 +14,37 @@ const {
   stripInternalSelectionFields,
   wholePassageSelectionRules,
 } = require("./lib/annotation-selection");
+const {
+  corsHeaders,
+  isAllowedOrigin,
+  isCostIncurringRequest,
+  resolveNetworkConfig,
+} = require("./lib/server-security");
+const {
+  filterLowValueAnnotations,
+  normalizeConnotations,
+  repairAnnotationOffsets,
+} = require("./lib/annotation-normalization");
+const {
+  CACHE_SCHEMA_VERSION,
+  LONG_FORM_THRESHOLD,
+  MAX_SOURCE_LENGTH,
+  cacheMaterial,
+  mergeUsage,
+  stableSerialize,
+} = require("./lib/analysis-core");
+const {
+  isAbortError,
+  mergeChunkResults,
+  runChunkPipeline,
+  splitTextRanges,
+} = require("./lib/long-form");
 
 const root = __dirname;
 loadDotEnv(path.join(root, ".env"));
 
 const port = Number(process.env.PORT || 4174);
+const networkConfig = resolveNetworkConfig(process.env, port);
 const standardModel = process.env.OPENAI_STANDARD_MODEL || "gpt-5.6-luna";
 const preciseModel = process.env.OPENAI_PRECISE_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-sol";
 const reasoningEffort = process.env.OPENAI_REASONING_EFFORT || "low";
@@ -53,9 +79,7 @@ function loadDotEnv(filePath) {
 function sendJson(res, status, data) {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
-    "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET,POST,OPTIONS",
-    "access-control-allow-headers": "content-type",
+    ...(res.corsHeaders || {}),
   });
   res.end(JSON.stringify(data));
 }
@@ -65,7 +89,7 @@ function readBody(req) {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 180_000) {
+      if (body.length > 1_200_000) {
         reject(new Error("request body too large"));
         req.destroy();
       }
@@ -129,6 +153,7 @@ async function callOpenAI(input, maxOutputTokens, options = {}) {
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: options.signal,
   });
 
   if (!response.ok) {
@@ -142,9 +167,9 @@ async function callOpenAI(input, maxOutputTokens, options = {}) {
   return response.json();
 }
 
-async function parseOrRepairJson(rawText, contextLabel) {
+async function parseOrRepairJsonWithUsage(rawText, contextLabel, options = {}) {
   try {
-    return parseJsonObject(rawText);
+    return { value: parseJsonObject(rawText), usage: null };
   } catch (firstError) {
     const repairPrompt = [
       "Repair this into one valid JSON object.",
@@ -158,8 +183,8 @@ async function parseOrRepairJson(rawText, contextLabel) {
       const repaired = await callOpenAI([
         { role: "system", content: repairPrompt },
         { role: "user", content: rawText.slice(0, 20000) },
-      ], 6000, { jsonObject: true });
-      return parseJsonObject(extractText(repaired));
+      ], 6000, { jsonObject: true, model: options.model, signal: options.signal });
+      return { value: parseJsonObject(extractText(repaired)), usage: repaired.usage || null };
     } catch (repairError) {
       const error = new Error(`The model returned malformed JSON and automatic repair failed: ${firstError.message}`);
       error.cause = repairError;
@@ -176,7 +201,7 @@ function needsJapaneseTranslationRepair(explanationLanguage, translation) {
   return unexpectedJapaneseTranslationScript.test(String(translation || ""));
 }
 
-async function repairJapaneseTranslation(sourceText, candidate, requestModel) {
+async function repairJapaneseTranslation(sourceText, candidate, requestModel, signal) {
   let translation = String(candidate || "");
   const usages = [];
   for (let attempt = 0; attempt < 2 && needsJapaneseTranslationRepair("ja", translation); attempt += 1) {
@@ -194,34 +219,17 @@ async function repairJapaneseTranslation(sourceText, candidate, requestModel) {
         role: "user",
         content: JSON.stringify({ sourceText, candidateTranslation: translation }),
       },
-    ], 6000, { jsonObject: true, model: requestModel });
+    ], 6000, { jsonObject: true, model: requestModel, signal });
     usages.push(repaired.usage || null);
-    const parsed = await parseOrRepairJson(extractText(repaired), "Japanese translation repair");
-    translation = String(parsed.translation || "").trim();
+    const parsed = await parseOrRepairJsonWithUsage(
+      extractText(repaired),
+      "Japanese translation repair",
+      { model: requestModel, signal },
+    );
+    usages.push(parsed.usage);
+    translation = String(parsed.value.translation || "").trim();
   }
   return { translation, usage: mergeUsage(usages) };
-}
-
-function mergeUsage(usages) {
-  return usages.filter(Boolean).reduce((totals, usage) => ({
-    input_tokens: totals.input_tokens + Number(usage.input_tokens || 0),
-    output_tokens: totals.output_tokens + Number(usage.output_tokens || 0),
-    total_tokens: totals.total_tokens + Number(usage.total_tokens || 0),
-    input_tokens_details: {
-      cached_tokens: totals.input_tokens_details.cached_tokens
-        + Number(usage.input_tokens_details?.cached_tokens || 0),
-    },
-    output_tokens_details: {
-      reasoning_tokens: totals.output_tokens_details.reasoning_tokens
-        + Number(usage.output_tokens_details?.reasoning_tokens || 0),
-    },
-  }), {
-    input_tokens: 0,
-    output_tokens: 0,
-    total_tokens: 0,
-    input_tokens_details: { cached_tokens: 0 },
-    output_tokens_details: { reasoning_tokens: 0 },
-  });
 }
 
 function levelPrompt(level) {
@@ -341,6 +349,15 @@ function buildAnnotationPrompt(payload) {
     "",
     `Target level: ${levelPrompt(payload.level)}`,
     `Focus: ${focusPrompt(payload.focus)}`,
+    ...(payload.chunkContext
+      ? [
+          `This is section ${payload.chunkContext.index} of ${payload.chunkContext.total} in one longer document.`,
+          "Analyze and translate only sourceText. The neighboring context below is supplied only to interpret boundary-adjacent wording and must not be annotated, translated, or included in offsets.",
+          `Preceding context: ${JSON.stringify(payload.chunkContext.before || "")}`,
+          `Following context: ${JSON.stringify(payload.chunkContext.after || "")}`,
+          "All returned offsets must be relative to this section's sourceText, starting at zero.",
+        ]
+      : []),
     ...wholePassageSelectionRules(discoveryTarget),
     includeGrammar
       ? "Include grammar items when they are useful."
@@ -463,6 +480,7 @@ async function completeLaterAnnotations({
   annotations,
   sourceLanguage,
   annotationModel,
+  signal,
 }) {
   const review = findLaterCoverageReview(text, annotations);
   if (!review) {
@@ -494,8 +512,13 @@ async function completeLaterAnnotations({
         existingTargets: annotations.map((item) => item.text),
       }, null, 2),
     },
-  ], 5000, { jsonObject: true, model: annotationModel });
-  const parsed = await parseOrRepairJson(extractText(data), "later annotation coverage review");
+  ], 5000, { jsonObject: true, model: annotationModel, signal });
+  const parsedResult = await parseOrRepairJsonWithUsage(
+    extractText(data),
+    "later annotation coverage review",
+    { model: annotationModel, signal },
+  );
+  const parsed = parsedResult.value;
   const localAnnotations = filterLowValueAnnotations(
     repairAnnotationOffsets(reviewText, parsed.annotations),
     payload.level,
@@ -512,7 +535,7 @@ async function completeLaterAnnotations({
 
   return {
     annotations: merged,
-    usage: data.usage || null,
+    usage: mergeUsage([data.usage, parsedResult.usage]),
     telemetry: {
       attempted: true,
       completed: true,
@@ -535,22 +558,18 @@ function loadYouTubeTranscriptModule() {
 function validateAnnotationPayload(payload) {
   const text = String(payload.text || "").trim();
   if (!text) return "text is required";
-  if (text.length > 20000) return "text is too long; keep it under 20000 characters";
+  if (text.length > MAX_SOURCE_LENGTH) {
+    return `text is too long; keep it under ${MAX_SOURCE_LENGTH} characters`;
+  }
   return "";
 }
 
 function annotationCacheKey(text, payload, annotationModel) {
-  return crypto.createHash("sha256").update(JSON.stringify({
+  return crypto.createHash("sha256").update(stableSerialize(cacheMaterial({
     text,
-    sourceLanguage: payload.sourceLanguage || "auto",
-    explanationLanguage: payload.explanationLanguage || "ja",
-    level: payload.level || "intermediate",
-    focus: payload.focus || "all",
-    includeGrammar: payload.includeGrammar !== false,
-    includeSlash: payload.includeSlash !== false,
-    connotationTargets: payload.connotationTargets || [],
-    annotationModel,
-  })).digest("hex");
+    ...payload,
+    model: annotationModel,
+  }))).digest("hex");
 }
 
 function getCachedCandidateResult(key) {
@@ -572,12 +591,20 @@ function setCachedCandidateResult(key, value) {
   }
 }
 
+async function parseOrRepairJson(rawText, contextLabel, options = {}) {
+  return (await parseOrRepairJsonWithUsage(rawText, contextLabel, options)).value;
+}
+
 function finalizeAnnotationResponse(candidateResult, payload, api) {
   const result = JSON.parse(JSON.stringify(candidateResult));
   const candidates = Array.isArray(result.annotations) ? result.annotations : [];
   const displayed = selectAnnotationsByDensity(candidates, payload.density)
     .map(stripInternalSelectionFields);
   result.annotations = displayed;
+  result._selection = {
+    version: CACHE_SCHEMA_VERSION,
+    candidates,
+  };
   result._api = {
     ...api,
     density: Number(payload.density) <= 1 ? "low" : Number(payload.density) >= 3 ? "high" : "standard",
@@ -611,93 +638,213 @@ async function handleAnnotate(req, res) {
   }
 
   const text = String(payload.text).trim();
+  const progressStream = payload.streamProgress === true && text.length > LONG_FORM_THRESHOLD;
+  const abortController = new AbortController();
+  req.once("aborted", () => abortController.abort());
+  res.once("close", () => {
+    if (!res.writableEnded) abortController.abort();
+  });
+
+  if (progressStream) startProgressStream(res);
+
+  try {
+    const result = await analyzePayload({
+      payload,
+      text,
+      signal: abortController.signal,
+      onProgress: (progress) => {
+        if (progressStream) sendProgressEvent(res, { type: "progress", ...progress });
+      },
+    });
+    if (progressStream) {
+      sendProgressEvent(res, { type: "result", result });
+      res.end();
+    } else {
+      sendJson(res, 200, result);
+    }
+  } catch (error) {
+    const code = error.code || (error.status ? "openai_request_failed" : "annotation_failed");
+    const response = {
+      error: code,
+      message: String(error.message || error),
+      detail: error.detail,
+      completedChunks: error.completedChunks,
+      failedChunk: error.failedChunk,
+      totalChunks: error.totalChunks,
+      usage: error.usage,
+    };
+    if (progressStream) {
+      if (!res.destroyed) {
+        sendProgressEvent(res, { type: "error", ...response });
+        res.end();
+      }
+    } else if (!res.destroyed) {
+      sendJson(res, code === "analysis_cancelled" ? 499 : 502, response);
+    }
+  }
+}
+
+async function analyzePayload({ payload, text, signal, onProgress }) {
   const analysisMode = payload.analysisMode === "precise" ? "precise" : "standard";
   const annotationModel = analysisMode === "precise" ? preciseModel : standardModel;
   const hasConnotationTargets = Array.isArray(payload.connotationTargets)
     && payload.connotationTargets.length > 0;
   const cacheKey = annotationCacheKey(text, payload, annotationModel);
-  if (!hasConnotationTargets) {
+  if (!hasConnotationTargets && payload.forceRefresh !== true) {
     const cached = getCachedCandidateResult(cacheKey);
     if (cached) {
-      sendJson(res, 200, finalizeAnnotationResponse(cached.result, payload, {
+      return finalizeAnnotationResponse(cached.result, payload, {
         model: annotationModel,
         analysisMode,
-        usage: null,
+        usage: cached.usage || null,
         candidateCacheHit: true,
+        usageIsReused: true,
         coverageCompletion: cached.coverageCompletion,
-      }));
-      return;
+        longForm: cached.chunkCount > 1,
+        chunkCount: cached.chunkCount || 1,
+      });
     }
   }
 
-  try {
-    const data = await callOpenAI([
-      { role: "system", content: buildAnnotationPrompt({ ...payload, text }) },
-      {
-        role: "user",
-        content: JSON.stringify({
-          sourceText: text,
-          sourceLanguage: payload.sourceLanguage || "auto",
-          explanationLanguage: payload.explanationLanguage || "ja",
-        }, null, 2),
-      },
-    ], 13000, { jsonObject: true, model: annotationModel });
-
-    const parsed = await parseOrRepairJson(extractText(data), "annotation result");
-    parsed.sourceText = text;
-    parsed.annotations = mergeUniqueNonOverlappingAnnotations(
-      [],
-      filterLowValueAnnotations(
-        repairAnnotationOffsets(text, parsed.annotations),
-        payload.level,
-        parsed.sourceLanguage || payload.sourceLanguage,
-      ),
-    );
-    parsed.connotations = normalizeConnotations(text, parsed.connotations);
-    parsed.sourceLanguage = parsed.sourceLanguage || payload.sourceLanguage || "auto";
-    parsed.explanationLanguage = parsed.explanationLanguage || payload.explanationLanguage || "ja";
-    parsed.translation = parsed.translation || "";
-    parsed.level = payload.level || parsed.level || "intermediate";
-    let usage = data.usage || null;
-    let coverageCompletion = { attempted: false, added: 0 };
-    if (!hasConnotationTargets) {
-      try {
-        const completion = await completeLaterAnnotations({
-          text,
-          payload,
-          annotations: parsed.annotations,
-          sourceLanguage: parsed.sourceLanguage,
+  let candidateResult;
+  let usage;
+  let coverageCompletion;
+  let chunkCount = 1;
+  if (text.length > LONG_FORM_THRESHOLD && !hasConnotationTargets) {
+    const chunks = splitTextRanges(text);
+    const analyzedChunks = await runChunkPipeline({
+      chunks,
+      signal,
+      onProgress,
+      analyzeChunk: async (chunk, index, total) => {
+        const analyzed = await analyzeSingleText({
+          text: chunk.text,
+          payload: {
+            ...payload,
+            chunkContext: {
+              index: index + 1,
+              total,
+              before: chunk.contextBefore,
+              after: chunk.contextAfter,
+            },
+          },
           annotationModel,
+          signal,
         });
-        parsed.annotations = completion.annotations;
-        coverageCompletion = completion.telemetry;
-        if (completion.usage) usage = mergeUsage([usage, completion.usage]);
-      } catch {
-        coverageCompletion = { attempted: true, completed: false, added: 0 };
-      }
-    }
-    if (needsJapaneseTranslationRepair(parsed.explanationLanguage, parsed.translation)) {
-      const repaired = await repairJapaneseTranslation(text, parsed.translation, annotationModel);
-      parsed.translation = repaired.translation;
-      usage = mergeUsage([usage, repaired.usage]);
-    }
-    if (!hasConnotationTargets) {
-      setCachedCandidateResult(cacheKey, { result: parsed, coverageCompletion });
-    }
-    sendJson(res, 200, finalizeAnnotationResponse(parsed, payload, {
-      model: annotationModel,
-      analysisMode,
-      usage,
-      candidateCacheHit: false,
+        return { chunk, ...analyzed };
+      },
+    });
+    const merged = mergeChunkResults(text, analyzedChunks, {
+      sourceLanguage: payload.sourceLanguage || "auto",
+      explanationLanguage: payload.explanationLanguage || "ja",
+      level: payload.level || "intermediate",
+    });
+    candidateResult = merged.result;
+    usage = merged.usage;
+    coverageCompletion = merged.coverageCompletion;
+    chunkCount = merged.chunkCount;
+  } else {
+    const analyzed = await analyzeSingleText({ text, payload, annotationModel, signal });
+    candidateResult = analyzed.result;
+    usage = analyzed.usage;
+    coverageCompletion = analyzed.coverageCompletion;
+  }
+
+  if (!hasConnotationTargets) {
+    setCachedCandidateResult(cacheKey, {
+      result: candidateResult,
       coverageCompletion,
-    }));
-  } catch (error) {
-    sendJson(res, 502, {
-      error: error.status ? "openai_request_failed" : "annotation_failed",
-      message: String(error.message || error),
-      detail: error.detail,
+      usage,
+      chunkCount,
     });
   }
+  return finalizeAnnotationResponse(candidateResult, payload, {
+    model: annotationModel,
+    analysisMode,
+    usage,
+    candidateCacheHit: false,
+    usageIsReused: false,
+    coverageCompletion,
+    longForm: chunkCount > 1,
+    chunkCount,
+  });
+}
+
+async function analyzeSingleText({ text, payload, annotationModel, signal }) {
+  const data = await callOpenAI([
+    { role: "system", content: buildAnnotationPrompt({ ...payload, text }) },
+    {
+      role: "user",
+      content: JSON.stringify({
+        sourceText: text,
+        sourceLanguage: payload.sourceLanguage || "auto",
+        explanationLanguage: payload.explanationLanguage || "ja",
+      }, null, 2),
+    },
+  ], 13000, { jsonObject: true, model: annotationModel, signal });
+
+  const parsedResult = await parseOrRepairJsonWithUsage(
+    extractText(data),
+    "annotation result",
+    { model: annotationModel, signal },
+  );
+  const parsed = parsedResult.value;
+  parsed.sourceText = text;
+  parsed.annotations = mergeUniqueNonOverlappingAnnotations(
+    [],
+    filterLowValueAnnotations(
+      repairAnnotationOffsets(text, parsed.annotations),
+      payload.level,
+      parsed.sourceLanguage || payload.sourceLanguage,
+    ),
+  );
+  parsed.connotations = normalizeConnotations(text, parsed.connotations);
+  parsed.sourceLanguage = parsed.sourceLanguage || payload.sourceLanguage || "auto";
+  parsed.explanationLanguage = parsed.explanationLanguage || payload.explanationLanguage || "ja";
+  parsed.translation = parsed.translation || "";
+  parsed.level = payload.level || parsed.level || "intermediate";
+  let usage = mergeUsage([data.usage, parsedResult.usage]);
+  let coverageCompletion = { attempted: false, added: 0 };
+  const hasConnotationTargets = Array.isArray(payload.connotationTargets)
+    && payload.connotationTargets.length > 0;
+
+  if (!hasConnotationTargets) {
+    try {
+      const completion = await completeLaterAnnotations({
+        text,
+        payload,
+        annotations: parsed.annotations,
+        sourceLanguage: parsed.sourceLanguage,
+        annotationModel,
+        signal,
+      });
+      parsed.annotations = completion.annotations;
+      coverageCompletion = completion.telemetry;
+      usage = mergeUsage([usage, completion.usage]);
+    } catch (error) {
+      if (signal?.aborted || isAbortError(error)) throw error;
+      coverageCompletion = { attempted: true, completed: false, added: 0 };
+    }
+  }
+  if (needsJapaneseTranslationRepair(parsed.explanationLanguage, parsed.translation)) {
+    const repaired = await repairJapaneseTranslation(text, parsed.translation, annotationModel, signal);
+    parsed.translation = repaired.translation;
+    usage = mergeUsage([usage, repaired.usage]);
+  }
+  return { result: parsed, usage, coverageCompletion };
+}
+
+function startProgressStream(res) {
+  res.writeHead(200, {
+    "content-type": "application/x-ndjson; charset=utf-8",
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+    ...(res.corsHeaders || {}),
+  });
+}
+
+function sendProgressEvent(res, event) {
+  if (!res.destroyed) res.write(`${JSON.stringify(event)}\n`);
 }
 
 async function handleYouTubeTranscript(req, res) {
@@ -885,128 +1032,6 @@ async function fetchYouTubeTitle(videoId) {
   }
 }
 
-const connotationCategories = new Set([
-  "evaluative",
-  "stance",
-  "politeness",
-  "implicature",
-  "presupposition",
-  "register",
-  "irony",
-  "euphemism",
-]);
-
-const connotationScopes = new Set(["span", "sentence", "utterance", "passage"]);
-const connotationConfidence = new Set(["high", "medium", "low"]);
-const connotationConventionality = new Set(["conventional", "contextual", "mixed"]);
-
-function normalizeConnotations(sourceText, connotations) {
-  if (!Array.isArray(connotations)) return [];
-
-  return connotations
-    .map((item, index) => {
-      const text = String(item?.text || "");
-      if (!text) return null;
-      const located = locateConnotation(sourceText, text, item.start, item.end);
-      if (!located) return null;
-
-      const alternatives = Array.isArray(item.alternatives)
-        ? item.alternatives.map((value) => String(value || "").trim()).filter(Boolean)
-        : [];
-      const evidence = Array.isArray(item.evidence)
-        ? item.evidence.map((value) => String(value || "").trim()).filter(Boolean)
-        : [];
-      const category = connotationCategories.has(item.category) ? item.category : "stance";
-
-      return {
-        id: String(item.id || `c${index + 1}`),
-        text: sourceText.slice(located.start, located.end),
-        start: located.start,
-        end: located.end,
-        scope: connotationScopes.has(item.scope) ? item.scope : "span",
-        category,
-        secondaryCategories: [...new Set(
-          (Array.isArray(item.secondaryCategories) ? item.secondaryCategories : [])
-            .filter((secondary) => connotationCategories.has(secondary) && secondary !== category),
-        )],
-        subtype: String(item.subtype || "unspecified").trim() || "unspecified",
-        literalMeaning: String(item.literalMeaning || "").trim(),
-        suggestedMeaning: String(item.suggestedMeaning || "").trim(),
-        pragmaticEffect: String(item.pragmaticEffect || "").trim(),
-        contextNote: String(item.contextNote || "").trim(),
-        confidence: connotationConfidence.has(item.confidence) ? item.confidence : "medium",
-        alternatives,
-        evidence,
-        conventionality: connotationConventionality.has(item.conventionality)
-          ? item.conventionality
-          : "contextual",
-      };
-    })
-    .filter((item) => item && item.suggestedMeaning && item.contextNote);
-}
-
-function locateConnotation(sourceText, text, start, end) {
-  if (
-    Number.isInteger(start)
-    && Number.isInteger(end)
-    && start >= 0
-    && end > start
-    && end <= sourceText.length
-    && sourceText.slice(start, end) === text
-  ) {
-    return { start, end };
-  }
-
-  const index = sourceText.indexOf(text);
-  return index >= 0 ? { start: index, end: index + text.length } : null;
-}
-
-const elementaryEnglishSingleWords = new Set([
-  "a", "an", "the",
-  "i", "you", "he", "she", "it", "we", "they",
-  "am", "is", "are", "was", "were", "be", "been", "being",
-]);
-
-function filterLowValueAnnotations(annotations, level, sourceLanguage) {
-  if (level === "beginner") return annotations;
-  const language = String(sourceLanguage || "").toLowerCase();
-  if (language !== "en" && language !== "english") return annotations;
-
-  return annotations.filter((item) => {
-    const target = String(item?.text || "").trim().toLowerCase();
-    return !elementaryEnglishSingleWords.has(target);
-  });
-}
-
-function repairAnnotationOffsets(sourceText, annotations) {
-  if (!Array.isArray(annotations)) return [];
-  const occupied = [];
-
-  return annotations.map((item) => {
-    const annotationText = String(item?.text || "");
-    if (!annotationText) return null;
-
-    const candidates = [];
-    if (Number.isInteger(item.start) && Number.isInteger(item.end)) {
-      candidates.push([item.start, item.end]);
-    }
-    let index = sourceText.indexOf(annotationText);
-    while (index >= 0) {
-      candidates.push([index, index + annotationText.length]);
-      index = sourceText.indexOf(annotationText, index + 1);
-    }
-
-    for (const [start, end] of candidates) {
-      if (start < 0 || end <= start || end > sourceText.length) continue;
-      if (sourceText.slice(start, end) !== annotationText) continue;
-      if (occupied.some((range) => start < range.end && end > range.start)) continue;
-      occupied.push({ start, end });
-      return { ...item, start, end };
-    }
-    return null;
-  }).filter(Boolean);
-}
-
 async function handleUiTranslations(req, res) {
   let payload;
   try {
@@ -1085,7 +1110,24 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const origin = String(req.headers.origin || "");
+  const requestHost = String(req.headers.host || "");
+  const originAllowed = isAllowedOrigin(origin, requestHost, networkConfig);
+  res.corsHeaders = corsHeaders(origin, requestHost, networkConfig);
+
+  if (isCostIncurringRequest(req.method, req.url) && !originAllowed) {
+    sendJson(res, 403, {
+      error: "origin_forbidden",
+      message: "This local API does not accept requests from that origin.",
+    });
+    return;
+  }
+
   if (req.method === "OPTIONS") {
+    if (!originAllowed) {
+      sendJson(res, 403, { error: "origin_forbidden", message: "Origin is not allowed." });
+      return;
+    }
     sendJson(res, 204, {});
     return;
   }
@@ -1123,8 +1165,10 @@ const server = http.createServer(async (req, res) => {
   serveStatic(req, res);
 });
 
-server.listen(port, () => {
-  console.log(`Annotator-Connotator: http://localhost:${port}`);
+server.listen(port, networkConfig.host, () => {
+  const address = server.address();
+  const listeningPort = typeof address === "object" && address ? address.port : port;
+  console.log(`Annotator-Connotator: http://localhost:${listeningPort} (${networkConfig.host})`);
   console.log(
     process.env.OPENAI_API_KEY
       ? `LLM enabled: standard=${standardModel}, precise=${preciseModel}`

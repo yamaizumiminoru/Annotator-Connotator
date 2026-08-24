@@ -28,6 +28,8 @@ You can also start it manually:
 
 Then open `http://localhost:4174`.
 
+The server binds to `127.0.0.1` by default and rejects unexpected browser origins on POST endpoints that can spend API usage. Broader access is explicit: set `ALLOW_NETWORK=1` and optionally `HOST` for LAN binding, and list any intentional cross-origin web clients in the comma-separated `CORS_ORIGINS` variable. Do not expose this BYOK server directly to an untrusted network.
+
 ## Deployment Note
 
 This app needs a small local/server-side proxy because the OpenAI API key must
@@ -56,6 +58,14 @@ variable on the host.
 - Covers evaluative nuance, stance, politeness, implicature, presupposition, register, irony, and euphemism.
 - Highlights the smallest useful anchor expression while preserving wider contrast and discourse conditions in the context and evidence fields.
 - Lets the learner switch nuance detail between brief, standard, and detailed without discarding the richer API result.
+- Transparently analyzes long lecture and transcript input in ordered sections while preserving global source offsets.
+- Shows section-based progress for long-form work and lets the learner cancel without replacing the previous successful result.
+
+## Long-Form Analysis
+
+Text over 18,000 JavaScript characters is divided at paragraph, sentence, line, or word boundaries into sections of about 7,500 characters. Each section receives a small amount of neighboring context for interpretation, but annotations, translation, and offsets are produced only for that section. Results are then remapped to global source offsets, deduplicated, globally ranked, and density-filtered once across the complete document. Translation and slash reading are combined in source order; Connotator remains precision-first.
+
+The local safety ceiling is 250,000 characters. Actual latency and API usage grow with the number of sections. Cancelling aborts the current browser request and prevents later section calls; a provider request that has already started may still have consumed usage. A failed section is reported as a partial failure, and no incomplete result replaces the previous successful analysis.
 
 ## Annotation Selection And Density
 
@@ -76,6 +86,14 @@ Run the deterministic regression tests with:
 ```powershell
 npm.cmd test
 ```
+
+Run the same no-API checks used by GitHub Actions with:
+
+```powershell
+npm.cmd run ci
+```
+
+Default CI performs syntax checks, deterministic unit/integration tests, and language-catalog fixture validation. Paid OpenAI smoke tests and benchmark scripts remain separate and are never run by default CI.
 
 ## Connotator Output
 

@@ -496,6 +496,16 @@ select {
   cursor: help;
 }
 
+.cancel-btn {
+  border-color: #c56b57;
+  color: #8a3527;
+  font-weight: 650;
+}
+
+.cancel-btn:hover {
+  background: #fae5df;
+}
+
 .legend-help:hover,
 .legend-help:focus-visible {
   border-color: var(--accent-2);
