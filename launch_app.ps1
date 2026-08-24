@@ -62,7 +62,7 @@ function Test-AppHealth($Url, $ExpectedVersion) {
 }
 
 $port = [int](Read-EnvValue "PORT" "4174")
-$healthUrl = "http://localhost:$port/api/health"
+$healthUrl = "http://127.0.0.1:$port/api/health"
 $pidPath = Join-Path $AppDir "server.pid"
 $packagePath = Join-Path $AppDir "package.json"
 $expectedVersion = (Get-Content -LiteralPath $packagePath -Raw | ConvertFrom-Json).version

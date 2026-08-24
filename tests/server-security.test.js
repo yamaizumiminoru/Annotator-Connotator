@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const net = require("node:net");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
@@ -34,6 +35,11 @@ test("identifies the local POST endpoints that can incur API usage", () => {
   assert.equal(isCostIncurringRequest("POST", "/api/youtube-transcript?x=1"), true);
   assert.equal(isCostIncurringRequest("POST", "/api/ui-translations"), true);
   assert.equal(isCostIncurringRequest("GET", "/api/health"), false);
+});
+
+test("desktop launcher checks the IPv4 loopback address used by the server", () => {
+  const launcher = fs.readFileSync(path.join(__dirname, "..", "launch_app.ps1"), "utf8");
+  assert.match(launcher, /healthUrl = "http:\/\/127\.0\.0\.1:\$port\/api\/health"/);
 });
 
 test("server rejects an arbitrary browser origin without exposing wildcard CORS", async (t) => {

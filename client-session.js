@@ -291,6 +291,13 @@
     }
   }
 
+  function forceRefreshInit(init, payload) {
+    return {
+      ...init,
+      body: JSON.stringify({ ...payload, forceRefresh: true }),
+    };
+  }
+
   function collectUiPayload(root) {
     const text = root.document.getElementById("sourceText")?.value?.trim() || "";
     return {
@@ -438,7 +445,8 @@
           }
         }
 
-        const response = await originalFetch(input, init);
+        const requestInit = bypassCache && payload ? forceRefreshInit(init, payload) : init;
+        const response = await originalFetch(input, requestInit);
         if (payload) void captureFreshResponse(response.clone(), payload);
         return response;
       }
@@ -480,6 +488,7 @@
     collectUiPayload,
     densityName,
     extractResultFromNdjson,
+    forceRefreshInit,
     formatUsageMetadata,
     install,
     rankCandidates,

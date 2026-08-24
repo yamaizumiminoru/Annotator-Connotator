@@ -5,6 +5,7 @@ const {
   applyDensityToCachedResult,
   cacheMaterialString,
   extractResultFromNdjson,
+  forceRefreshInit,
   formatUsageMetadata,
   selectCandidatesByDensity,
   shortModelName,
@@ -46,6 +47,27 @@ test("extractResultFromNdjson returns the final result event", () => {
     "",
   ].join("\n"));
   assert.equal(result._api.model, "gpt-5.6-sol");
+});
+
+test("forced re-analysis also bypasses the server-side candidate cache", () => {
+  const signal = new AbortController().signal;
+  const init = {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    signal,
+    body: JSON.stringify({ text: "A useful passage.", density: 2 }),
+  };
+  const forced = forceRefreshInit(init, JSON.parse(init.body));
+
+  assert.notEqual(forced, init);
+  assert.equal(forced.signal, signal);
+  assert.equal(forced.headers, init.headers);
+  assert.deepEqual(JSON.parse(forced.body), {
+    text: "A useful passage.",
+    density: 2,
+    forceRefresh: true,
+  });
+  assert.equal(JSON.parse(init.body).forceRefresh, undefined);
 });
 
 test("cache material ignores density but changes with model and analytical settings", () => {
