@@ -1,11 +1,19 @@
 (function initClientSession(root, factory) {
-  const api = factory();
+  const analysisCore = typeof module === "object" && module.exports
+    ? require("./lib/analysis-core.js")
+    : root?.ANALYSIS_CORE;
+  const api = factory(analysisCore);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root && root.document) {
     root.ANNOTATOR_CLIENT_SESSION = api;
     api.install(root);
   }
-}(typeof globalThis !== "undefined" ? globalThis : this, () => {
+}(typeof globalThis !== "undefined" ? globalThis : this, (analysisCore) => {
+  const DB_NAME = "annotator-connotator";
+  const DB_VERSION = 1;
+  const STORE_NAME = "analysis-results";
+  const MAX_CACHE_ENTRIES = 20;
+
   const UI_ADDITIONS = {
     ja: {
       usageInput: "入力",
@@ -16,6 +24,8 @@
       usagePrecise: "精密",
       usageChunks: "{count}セクション",
       usageLocalCache: "ローカルキャッシュ",
+      reanalyzeFresh: "再解析",
+      reanalyzeFreshTitle: "保存済み結果を使わず、モデルでもう一度解析する",
     },
     en: {
       usageInput: "input",
@@ -26,6 +36,8 @@
       usagePrecise: "precise",
       usageChunks: "{count} sections",
       usageLocalCache: "local cache",
+      reanalyzeFresh: "Re-run",
+      reanalyzeFreshTitle: "Run the model again instead of using a saved result",
     },
   };
 
@@ -96,16 +108,211 @@
         const event = JSON.parse(line);
         if (event.type === "result" && event.result) result = event.result;
       } catch {
-        // The main stream reader reports malformed progress data; metadata display stays optional.
+        // The main stream reader reports malformed progress data; metadata/cache stays optional.
       }
     }
     return result;
+  }
+
+  function normalizePriority(value) {
+    const priority = Math.round(Number(value));
+    return Number.isFinite(priority) ? Math.min(5, Math.max(1, priority)) : 3;
+  }
+
+  function reliabilityScore(value) {
+    return { high: 3, medium: 2, low: 1 }[String(value || "medium").toLowerCase()] || 2;
+  }
+
+  function rankCandidates(candidates) {
+    return (Array.isArray(candidates) ? candidates : []).map((item, index) => ({
+      ...item,
+      priority: normalizePriority(item?.priority),
+      reliability: ["high", "medium", "low"].includes(String(item?.reliability || "").toLowerCase())
+        ? String(item.reliability).toLowerCase()
+        : "medium",
+      _modelOrder: index,
+    })).sort((a, b) => (
+      b.priority - a.priority
+      || reliabilityScore(b.reliability) - reliabilityScore(a.reliability)
+      || a._modelOrder - b._modelOrder
+    )).map(({ _modelOrder, ...item }) => item);
+  }
+
+  function selectCandidatesByDensity(candidates, density) {
+    const ranked = rankCandidates(candidates);
+    if (!ranked.length) return [];
+    const ratio = Number(density) <= 1 ? 0.4 : Number(density) >= 3 ? 1 : 0.7;
+    const count = Math.max(1, Math.ceil(ranked.length * ratio));
+    return ranked.slice(0, count)
+      .sort((a, b) => Number(a.start || 0) - Number(b.start || 0) || Number(a.end || 0) - Number(b.end || 0));
+  }
+
+  function stripSelectionFields(annotation) {
+    const { priority, reliability, ...publicAnnotation } = annotation || {};
+    return publicAnnotation;
+  }
+
+  function densityName(density) {
+    return Number(density) <= 1 ? "low" : Number(density) >= 3 ? "high" : "standard";
+  }
+
+  function cloneJson(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function applyDensityToCachedResult(result, density) {
+    if (!result || typeof result !== "object") return null;
+    const copy = cloneJson(result);
+    const candidates = copy._selection?.version === analysisCore?.CACHE_SCHEMA_VERSION
+      && Array.isArray(copy._selection?.candidates)
+      ? copy._selection.candidates
+      : null;
+
+    if (!candidates) {
+      if (copy._api?.density && copy._api.density !== densityName(density)) return null;
+    } else {
+      copy.annotations = selectCandidatesByDensity(candidates, density).map(stripSelectionFields);
+      copy._api = {
+        ...(copy._api || {}),
+        density: densityName(density),
+        candidateCount: candidates.length,
+        displayedAnnotationCount: copy.annotations.length,
+      };
+    }
+
+    copy._api = {
+      ...(copy._api || {}),
+      localCache: true,
+    };
+    return copy;
+  }
+
+  function cacheMaterialString(payload, model) {
+    if (!analysisCore?.cacheMaterial || !analysisCore?.stableSerialize) return "";
+    return analysisCore.stableSerialize(analysisCore.cacheMaterial({
+      ...payload,
+      model,
+      version: analysisCore.CACHE_SCHEMA_VERSION,
+    }));
+  }
+
+  async function sha256Hex(root, value) {
+    const text = String(value || "");
+    if (!root.crypto?.subtle || typeof TextEncoder === "undefined") {
+      let hash = 2166136261;
+      for (let index = 0; index < text.length; index += 1) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      return `fallback-${text.length}-${(hash >>> 0).toString(16)}`;
+    }
+    const bytes = new TextEncoder().encode(text);
+    const digest = await root.crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function buildCacheKey(root, payload, model) {
+    const material = cacheMaterialString(payload, model);
+    if (!material) return "";
+    return `${analysisCore.CACHE_SCHEMA_VERSION}:${await sha256Hex(root, material)}`;
+  }
+
+  function openCacheDb(root) {
+    if (!root.indexedDB) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const request = root.indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          const store = db.createObjectStore(STORE_NAME, { keyPath: "key" });
+          store.createIndex("savedAt", "savedAt", { unique: false });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+      request.onblocked = () => resolve(null);
+    });
+  }
+
+  async function getCacheEntry(root, key) {
+    if (!key) return null;
+    const db = await openCacheDb(root);
+    if (!db) return null;
+    return new Promise((resolve) => {
+      const transaction = db.transaction(STORE_NAME, "readonly");
+      const request = transaction.objectStore(STORE_NAME).get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => resolve(null);
+    });
+  }
+
+  async function putCacheEntry(root, entry) {
+    if (!entry?.key) return;
+    const db = await openCacheDb(root);
+    if (!db) return;
+    await new Promise((resolve) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      transaction.objectStore(STORE_NAME).put(entry);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => resolve();
+      transaction.onabort = () => resolve();
+    });
+    void pruneCache(root);
+  }
+
+  async function pruneCache(root) {
+    const db = await openCacheDb(root);
+    if (!db) return;
+    const entries = await new Promise((resolve) => {
+      const transaction = db.transaction(STORE_NAME, "readonly");
+      const request = transaction.objectStore(STORE_NAME).getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => resolve([]);
+    });
+    if (entries.length <= MAX_CACHE_ENTRIES) return;
+    const remove = entries.sort((a, b) => Number(b.savedAt || 0) - Number(a.savedAt || 0))
+      .slice(MAX_CACHE_ENTRIES);
+    await new Promise((resolve) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      for (const entry of remove) store.delete(entry.key);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => resolve();
+      transaction.onabort = () => resolve();
+    });
+  }
+
+  function parseJsonBody(init) {
+    if (typeof init?.body !== "string") return null;
+    try {
+      return JSON.parse(init.body);
+    } catch {
+      return null;
+    }
+  }
+
+  function collectUiPayload(root) {
+    const text = root.document.getElementById("sourceText")?.value?.trim() || "";
+    return {
+      text,
+      sourceLanguage: root.document.getElementById("sourceLangSelect")?.value || "auto",
+      explanationLanguage: root.document.getElementById("explanationLangSelect")?.value || "ja",
+      analysisMode: root.document.querySelector(".analysis-mode-segment.active")?.dataset.analysisMode || "standard",
+      level: root.document.querySelector(".segment.active[data-level]")?.dataset.level || "intermediate",
+      density: Number(root.document.getElementById("densityRange")?.value || 2),
+      focus: root.document.getElementById("focusSelect")?.value || "all",
+      includeGrammar: root.document.getElementById("includeGrammar")?.checked !== false,
+      includeSlash: root.document.getElementById("includeSlash")?.checked !== false,
+    };
   }
 
   function install(root) {
     installUiText(root);
     const originalFetch = root.fetch.bind(root);
     let lastApi = null;
+    let models = null;
+    let modelPromise = null;
+    let forceNextAnalysis = false;
 
     function renderMetadata() {
       const element = root.document.getElementById("analysisMeta");
@@ -124,46 +331,159 @@
       root.dispatchEvent(new CustomEvent("annotator:analysis-result", { detail: result }));
     }
 
-    async function captureResponse(response) {
+    async function captureFreshResponse(response, payload) {
       try {
         if (!response.ok) return;
         const contentType = response.headers.get("content-type") || "";
+        let result = null;
         if (contentType.includes("application/x-ndjson")) {
-          publishResult(extractResultFromNdjson(await response.text()));
-          return;
+          result = extractResultFromNdjson(await response.text());
+        } else if (contentType.includes("application/json")) {
+          result = await response.json();
         }
-        if (contentType.includes("application/json")) {
-          publishResult(await response.json());
-        }
+        if (!result?._api) return;
+        publishResult(result);
+        const model = String(result._api.model || "");
+        if (!model) return;
+        const key = await buildCacheKey(root, payload, model);
+        if (!key) return;
+        await putCacheEntry(root, {
+          key,
+          savedAt: Date.now(),
+          version: analysisCore.CACHE_SCHEMA_VERSION,
+          model,
+          result,
+        });
       } catch {
-        // Usage metadata must never interfere with the main analysis path.
+        // Cache/metadata is an optimization and must not break analysis rendering.
       }
     }
 
-    root.fetch = async function sessionAwareFetch(input, init) {
-      const response = await originalFetch(input, init);
-      try {
-        const url = new URL(typeof input === "string" ? input : input.url, root.location.href);
-        const method = String(init?.method || (typeof input !== "string" ? input.method : "GET") || "GET").toUpperCase();
-        if (method === "POST" && url.pathname === "/api/annotate") {
-          void captureResponse(response.clone());
+    async function ensureModels() {
+      if (models?.standard && models?.precise) return models;
+      if (modelPromise) return modelPromise;
+      modelPromise = (async () => {
+        try {
+          const response = await originalFetch("/api/health");
+          const data = await response.json();
+          models = data.models || { standard: data.model, precise: data.model };
+          return models;
+        } catch {
+          return null;
+        } finally {
+          modelPromise = null;
         }
+      })();
+      return modelPromise;
+    }
+
+    function rememberHealthResponse(response) {
+      void (async () => {
+        try {
+          if (!response.ok) return;
+          const data = await response.json();
+          models = data.models || { standard: data.model, precise: data.model };
+        } catch {
+          // Ignore; cache lookup will ask health directly when needed.
+        }
+      })();
+    }
+
+    async function modelForPayload(payload) {
+      const current = await ensureModels();
+      if (!current) return "";
+      return payload.analysisMode === "precise" ? String(current.precise || "") : String(current.standard || "");
+    }
+
+    async function cachedResultForPayload(payload) {
+      const model = await modelForPayload(payload);
+      if (!model) return null;
+      const key = await buildCacheKey(root, payload, model);
+      const entry = await getCacheEntry(root, key);
+      if (!entry || entry.version !== analysisCore.CACHE_SCHEMA_VERSION || entry.model !== model) return null;
+      return applyDensityToCachedResult(entry.result, payload.density);
+    }
+
+    root.fetch = async function sessionAwareFetch(input, init) {
+      let url;
+      try {
+        url = new URL(typeof input === "string" ? input : input.url, root.location.href);
       } catch {
-        // Fall through unchanged when request inspection is unavailable.
+        return originalFetch(input, init);
       }
-      return response;
+      const method = String(init?.method || (typeof input !== "string" ? input.method : "GET") || "GET").toUpperCase();
+
+      if (method === "GET" && url.pathname === "/api/health") {
+        const response = await originalFetch(input, init);
+        rememberHealthResponse(response.clone());
+        return response;
+      }
+
+      if (method === "POST" && url.pathname === "/api/annotate") {
+        const payload = parseJsonBody(init);
+        const bypassCache = forceNextAnalysis;
+        forceNextAnalysis = false;
+        if (payload && !bypassCache) {
+          try {
+            const cached = await cachedResultForPayload(payload);
+            if (cached) {
+              publishResult(cached);
+              return new Response(JSON.stringify(cached), {
+                status: 200,
+                headers: { "content-type": "application/json; charset=utf-8" },
+              });
+            }
+          } catch {
+            // A cache failure falls back to the normal paid request.
+          }
+        }
+
+        const response = await originalFetch(input, init);
+        if (payload) void captureFreshResponse(response.clone(), payload);
+        return response;
+      }
+
+      return originalFetch(input, init);
     };
+
+    root.document.getElementById("reanalyzeBtn")?.addEventListener("click", () => {
+      const analyzeButton = root.document.getElementById("annotateBtn");
+      if (!analyzeButton || analyzeButton.disabled) return;
+      forceNextAnalysis = true;
+      analyzeButton.click();
+    });
 
     root.document.getElementById("uiLangSelect")?.addEventListener("change", () => {
       root.setTimeout(renderMetadata, 0);
+    });
+
+    root.addEventListener("load", () => {
+      root.setTimeout(async () => {
+        const payload = collectUiPayload(root);
+        if (!payload.text) return;
+        try {
+          const cached = await cachedResultForPayload(payload);
+          if (!cached) return;
+          const analyzeButton = root.document.getElementById("annotateBtn");
+          if (analyzeButton && !analyzeButton.disabled) analyzeButton.click();
+        } catch {
+          // Reload restoration is best-effort and never blocks the app.
+        }
+      }, 0);
     });
   }
 
   return {
     UI_ADDITIONS,
+    applyDensityToCachedResult,
+    cacheMaterialString,
+    collectUiPayload,
+    densityName,
     extractResultFromNdjson,
     formatUsageMetadata,
     install,
+    rankCandidates,
+    selectCandidatesByDensity,
     shortModelName,
   };
 }));
