@@ -48,7 +48,8 @@ variable on the host.
 - Lets you choose a UI language.
 - Shows a full translation in the selected explanation language.
 - Adjusts extraction difficulty: beginner, intermediate, advanced.
-- Discovers level-appropriate candidates across the full passage, ranks them by pedagogical priority, and then adjusts annotation density.
+- Exhaustively scans medium and long passages in ordered sections so candidate discovery cannot silently stop after the beginning of the document.
+- Ranks level-appropriate candidates globally by pedagogical priority and then adjusts annotation density.
 - Switches between faster standard analysis with Luna and optional precise analysis with Sol.
 - Offers all, speaking, and academic perspectives without treating the item budget as a quota. Grammar inclusion remains a separate checkbox.
 - Sends the passage to the local server endpoint `POST /api/annotate`.
@@ -58,14 +59,18 @@ variable on the host.
 - Covers evaluative nuance, stance, politeness, implicature, presupposition, register, irony, and euphemism.
 - Highlights the smallest useful anchor expression while preserving wider contrast and discourse conditions in the context and evidence fields.
 - Lets the learner switch nuance detail between brief, standard, and detailed without discarding the richer API result.
-- Transparently analyzes long lecture and transcript input in ordered sections while preserving global source offsets.
-- Shows section-based progress for long-form work and lets the learner cancel without replacing the previous successful result.
+- Preserves global source offsets when ordered sections are merged back into one document.
+- Shows section-based progress for multi-section work and lets the learner cancel without replacing the previous successful result.
 - Shows the completed analysis model/mode and aggregate input, output, and total token usage without making another OpenAI request.
 - Persists completed analyses locally in IndexedDB so unchanged work can be restored and reused without another paid model call.
 
-## Long-Form Analysis
+## Ordered Section Analysis
 
-Text over 18,000 JavaScript characters is divided at paragraph, sentence, line, or word boundaries into sections of about 7,500 characters. Each section receives a small amount of neighboring context for interpretation, but annotations, translation, and offsets are produced only for that section. Results are then remapped to global source offsets, deduplicated, globally ranked, and density-filtered once across the complete document. Translation and slash reading are combined in source order; Connotator remains precision-first.
+Text over 3,200 JavaScript characters is divided at paragraph, sentence, line, or word boundaries into ordered sections of about 3,200 characters. This threshold is intentionally much lower than the old 18,000-character long-form threshold: a realistic lecture passage must now be inspected section by section rather than relying on one model response to keep searching through the entire document.
+
+Each section receives a small amount of neighboring context for interpretation, but annotations, translation, and offsets are produced only for that section. A section may legitimately return zero ordinary annotations when it contains no level-appropriate targets; the system does not fill a quota merely to create visual coverage. Every section is nevertheless analyzed before the document is finalized.
+
+Section results are remapped to global source offsets, deduplicated, globally ranked, and density-filtered once across the complete document. Translation and slash reading are combined in source order, so `translation` remains a full translation rather than a summary. `summaryJa` remains a separate summary field. Connotator remains precision-first and is not forced to produce a nuance annotation in every section.
 
 The local safety ceiling is 250,000 characters. Actual latency and API usage grow with the number of sections. Cancelling aborts the current browser request and prevents later section calls; a provider request that has already started may still have consumed usage. A failed section is reported as a partial failure, and no incomplete result replaces the previous successful analysis.
 
@@ -73,17 +78,19 @@ The local safety ceiling is 250,000 characters. Actual latency and API usage gro
 
 Completed analysis results are stored locally in browser IndexedDB. Cache identity includes the source text, source/explanation language, learner level, focus, grammar/slash settings, analysis mode, actual model, and cache-schema version. Display density is intentionally excluded from the identity because the richer ranked candidate pool can be filtered locally: low, standard, and high density therefore reuse the same eligible pool when a valid cached result is available.
 
+The cache schema is versioned. Changes to the analysis architecture can invalidate older saved candidate pools so a previously incomplete result is not silently restored after an upgrade.
+
 Reloading the app restores a matching saved result through the normal render path. Re-analyzing unchanged settings can also reuse the saved result without calling OpenAI. Use the **Re-run / 再解析** button when you explicitly want a fresh model generation; a fresh successful result replaces the saved entry for that exact analysis identity. Cache failures fall back to the normal server request rather than blocking analysis.
 
-The compact result metadata line shows the model, analysis mode, chunk count when applicable, and aggregate input/output/total token usage reported by the API. A result served from persistent browser cache is marked as a local-cache result. Token numbers on a cached result describe the original analysis that produced it; loading the cached result itself does not make another OpenAI request.
+The compact result metadata line shows the model, analysis mode, section count when applicable, and aggregate input/output/total token usage reported by the API. A result served from persistent browser cache is marked as a local-cache result. Token numbers on a cached result describe the original analysis that produced it; loading the cached result itself does not make another OpenAI request.
 
 ## Annotation Selection And Density
 
-Ordinary annotations are selected in three stages: full-passage candidate discovery, global ranking, and density filtering. The candidate discovery target scales with source length instead of using a fixed whole-passage 7 / 12 / 18 cap. Every candidate remains subject to the selected learner-level knowledge floor; longer input or higher density never permits elementary padding.
+Ordinary annotations are selected in three stages: ordered candidate discovery, global ranking, and density filtering. Text up to 3,200 characters can use a single analysis section; longer text is split into multiple ordered sections so every region is explicitly inspected. Candidate discovery targets scale with section length instead of using a fixed whole-passage 7 / 12 / 18 cap. Every candidate remains subject to the selected learner-level knowledge floor; longer input or higher density never permits elementary padding.
 
 The model assigns internal `priority` and `reliability` values to ordinary annotations. Pedagogical usefulness, reusability, and focus relevance determine priority; reliability is only a secondary ordering signal. Low, standard, and high density display 40%, 70%, and 100% of the same ranked candidate pool. The server keeps a short-lived in-memory candidate cache for immediate density changes, while the browser's persistent result cache can reuse the same ranked pool across reloads when the analysis identity still matches. A forced fresh model generation can still produce a different candidate pool.
 
-For longer passages, the server checks whether candidate offsets are implausibly concentrated near the beginning. If so, it reviews the substantial uncovered tail once, using the same difficulty floor, and merges only non-duplicate, non-overlapping eligible candidates before global ranking. The review may return nothing. This coverage fallback and density filtering apply only to ordinary annotations; Connotator remains sparse and precision-first.
+Within each analysis section, the existing later-coverage check remains as a secondary safeguard when returned offsets are implausibly concentrated near the section beginning. It may request a small same-difficulty completion pass and may also return no additions. The primary full-document coverage guarantee is now the ordered multi-section scan rather than a single tail-repair pass. These ordinary-annotation coverage rules do not force Connotator coverage.
 
 ## Learner-Facing Cards
 
