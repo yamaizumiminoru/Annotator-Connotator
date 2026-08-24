@@ -15,6 +15,10 @@ const {
   wholePassageSelectionRules,
 } = require("./lib/annotation-selection");
 const {
+  buildCandidateScanPrompt,
+  stripCandidateScanMetadata,
+} = require("./lib/candidate-scan");
+const {
   corsHeaders,
   isAllowedOrigin,
   isCostIncurringRequest,
@@ -49,6 +53,7 @@ const standardModel = process.env.OPENAI_STANDARD_MODEL || "gpt-5.6-luna";
 const preciseModel = process.env.OPENAI_PRECISE_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-sol";
 const reasoningEffort = process.env.OPENAI_REASONING_EFFORT || "low";
 const textVerbosity = process.env.OPENAI_TEXT_VERBOSITY || "low";
+const dedicatedCandidateScanEnabled = process.env.ANNOTATION_CANDIDATE_SCAN !== "0";
 let youtubeTranscriptModulePromise;
 const annotationCandidateCache = new Map();
 const candidateCacheTtlMs = 20 * 60 * 1000;
@@ -236,7 +241,7 @@ function levelPrompt(level) {
   const table = {
     beginner: "A1-A2 learners. Prefer everyday words, basic verb phrases, and simple grammar that blocks understanding.",
     intermediate: "B1-B2 learners. Prefer reusable collocations, natural phrases, phrasal verbs, discourse markers, and moderately abstract vocabulary.",
-    advanced: "C1 learners. Prefer nuance-heavy vocabulary, idioms, register, stance expressions, and compact academic or professional phrasing.",
+    advanced: "C1-C2 learners. Treat C1 as the general-language knowledge floor. Prefer nuance-heavy vocabulary, idioms, register, stance expressions, and compact academic or professional phrasing. Lower-CEFR wording should be omitted unless the expression as a unit is a domain term, phraseological unit, or reusable construction with genuine advanced-learner value.",
   };
   return table[level] || table.intermediate;
 }
@@ -548,6 +553,45 @@ async function completeLaterAnnotations({
   };
 }
 
+async function scanAnnotationCandidates({ text, payload, annotationModel, signal }) {
+  const data = await callOpenAI([
+    {
+      role: "system",
+      content: buildCandidateScanPrompt({
+        sourceLanguage: languageName(payload.sourceLanguage, "auto-detected source language"),
+        explanationLanguage: languageName(payload.explanationLanguage, "Japanese"),
+        level: payload.level || "intermediate",
+        focus: focusPrompt(payload.focus),
+        includeGrammar: payload.includeGrammar !== false,
+        discoveryTarget: candidateDiscoveryTarget(text),
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({ sourceText: text }, null, 2),
+    },
+  ], 6000, { jsonObject: true, model: annotationModel, signal });
+  const parsedResult = await parseOrRepairJsonWithUsage(
+    extractText(data),
+    "dedicated annotation candidate scan",
+    { model: annotationModel, signal },
+  );
+  const rawAnnotations = stripCandidateScanMetadata(parsedResult.value.annotations);
+  const sourceLanguage = payload.sourceLanguage || "auto";
+  const annotations = mergeUniqueNonOverlappingAnnotations(
+    [],
+    filterLowValueAnnotations(
+      repairAnnotationOffsets(text, rawAnnotations),
+      payload.level,
+      sourceLanguage,
+    ),
+  );
+  return {
+    annotations,
+    usage: mergeUsage([data.usage, parsedResult.usage]),
+  };
+}
+
 function loadYouTubeTranscriptModule() {
   if (!youtubeTranscriptModulePromise) {
     youtubeTranscriptModulePromise = import("@hallelx/youtube-transcript");
@@ -689,6 +733,9 @@ async function analyzePayload({ payload, text, signal, onProgress }) {
   const annotationModel = analysisMode === "precise" ? preciseModel : standardModel;
   const hasConnotationTargets = Array.isArray(payload.connotationTargets)
     && payload.connotationTargets.length > 0;
+  const candidateDiscoveryMode = dedicatedCandidateScanEnabled && !hasConnotationTargets
+    ? "dedicated-scan-v1"
+    : "integrated";
   const cacheKey = annotationCacheKey(text, payload, annotationModel);
   if (!hasConnotationTargets && payload.forceRefresh !== true) {
     const cached = getCachedCandidateResult(cacheKey);
@@ -700,6 +747,7 @@ async function analyzePayload({ payload, text, signal, onProgress }) {
         candidateCacheHit: true,
         usageIsReused: true,
         coverageCompletion: cached.coverageCompletion,
+        candidateDiscoveryMode,
         longForm: cached.chunkCount > 1,
         chunkCount: cached.chunkCount || 1,
       });
@@ -767,13 +815,17 @@ async function analyzePayload({ payload, text, signal, onProgress }) {
     candidateCacheHit: false,
     usageIsReused: false,
     coverageCompletion,
+    candidateDiscoveryMode,
     longForm: chunkCount > 1,
     chunkCount,
   });
 }
 
 async function analyzeSingleText({ text, payload, annotationModel, signal }) {
-  const data = await callOpenAI([
+  const hasConnotationTargets = Array.isArray(payload.connotationTargets)
+    && payload.connotationTargets.length > 0;
+  const useDedicatedCandidateScan = dedicatedCandidateScanEnabled && !hasConnotationTargets;
+  const analysisRequest = callOpenAI([
     { role: "system", content: buildAnnotationPrompt({ ...payload, text }) },
     {
       role: "user",
@@ -784,6 +836,12 @@ async function analyzeSingleText({ text, payload, annotationModel, signal }) {
       }, null, 2),
     },
   ], 13000, { jsonObject: true, model: annotationModel, signal });
+  const scanRequest = useDedicatedCandidateScan
+    ? scanAnnotationCandidates({ text, payload, annotationModel, signal })
+      .then((value) => ({ ok: true, value }))
+      .catch((error) => ({ ok: false, error }))
+    : Promise.resolve(null);
+  const [data, scanOutcome] = await Promise.all([analysisRequest, scanRequest]);
 
   const parsedResult = await parseOrRepairJsonWithUsage(
     extractText(data),
@@ -792,7 +850,7 @@ async function analyzeSingleText({ text, payload, annotationModel, signal }) {
   );
   const parsed = parsedResult.value;
   parsed.sourceText = text;
-  parsed.annotations = mergeUniqueNonOverlappingAnnotations(
+  const integratedAnnotations = mergeUniqueNonOverlappingAnnotations(
     [],
     filterLowValueAnnotations(
       repairAnnotationOffsets(text, parsed.annotations),
@@ -800,17 +858,33 @@ async function analyzeSingleText({ text, payload, annotationModel, signal }) {
       parsed.sourceLanguage || payload.sourceLanguage,
     ),
   );
+  const candidateScanCompleted = Boolean(scanOutcome?.ok);
+  parsed.annotations = candidateScanCompleted
+    ? scanOutcome.value.annotations
+    : integratedAnnotations;
   parsed.connotations = normalizeConnotations(text, parsed.connotations);
   parsed.sourceLanguage = parsed.sourceLanguage || payload.sourceLanguage || "auto";
   parsed.explanationLanguage = parsed.explanationLanguage || payload.explanationLanguage || "ja";
   parsed.translation = parsed.translation || "";
   parsed.level = payload.level || parsed.level || "intermediate";
-  let usage = mergeUsage([data.usage, parsedResult.usage]);
-  let coverageCompletion = { attempted: false, added: 0 };
-  const hasConnotationTargets = Array.isArray(payload.connotationTargets)
-    && payload.connotationTargets.length > 0;
+  let usage = mergeUsage([
+    data.usage,
+    parsedResult.usage,
+    candidateScanCompleted ? scanOutcome.value.usage : null,
+  ]);
+  const candidateScanTelemetry = {
+    attempted: useDedicatedCandidateScan,
+    completed: candidateScanCompleted,
+    candidateCount: candidateScanCompleted ? scanOutcome.value.annotations.length : 0,
+    fallback: useDedicatedCandidateScan && !candidateScanCompleted ? "integrated" : "none",
+  };
+  let coverageCompletion = {
+    attempted: false,
+    added: 0,
+    candidateScan: candidateScanTelemetry,
+  };
 
-  if (!hasConnotationTargets) {
+  if (!hasConnotationTargets && !candidateScanCompleted) {
     try {
       const completion = await completeLaterAnnotations({
         text,
@@ -821,11 +895,19 @@ async function analyzeSingleText({ text, payload, annotationModel, signal }) {
         signal,
       });
       parsed.annotations = completion.annotations;
-      coverageCompletion = completion.telemetry;
+      coverageCompletion = {
+        ...completion.telemetry,
+        candidateScan: candidateScanTelemetry,
+      };
       usage = mergeUsage([usage, completion.usage]);
     } catch (error) {
       if (signal?.aborted || isAbortError(error)) throw error;
-      coverageCompletion = { attempted: true, completed: false, added: 0 };
+      coverageCompletion = {
+        attempted: true,
+        completed: false,
+        added: 0,
+        candidateScan: candidateScanTelemetry,
+      };
     }
   }
   if (needsJapaneseTranslationRepair(parsed.explanationLanguage, parsed.translation)) {
@@ -1145,6 +1227,7 @@ const server = http.createServer(async (req, res) => {
         standard: standardModel,
         precise: preciseModel,
       },
+      candidateDiscoveryMode: dedicatedCandidateScanEnabled ? "dedicated-scan-v1" : "integrated",
     });
     return;
   }
@@ -1173,7 +1256,7 @@ server.listen(port, networkConfig.host, () => {
   console.log(`Annotator-Connotator: http://localhost:${listeningPort} (${networkConfig.host})`);
   console.log(
     process.env.OPENAI_API_KEY
-      ? `LLM enabled: standard=${standardModel}, precise=${preciseModel}`
+      ? `LLM enabled: standard=${standardModel}, precise=${preciseModel}, candidates=${dedicatedCandidateScanEnabled ? "dedicated-scan-v1" : "integrated"}`
       : "OPENAI_API_KEY is not set.",
   );
 });
