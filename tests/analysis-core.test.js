@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   CACHE_SCHEMA_VERSION,
+  LONG_FORM_THRESHOLD,
   cacheMaterial,
   mergeUsage,
   stableSerialize,
@@ -22,6 +23,11 @@ test("aggregates model and repair usage without losing detail counters", () => {
     output_tokens_details: { reasoning_tokens: 1 },
   });
   assert.equal(mergeUsage([]), null);
+});
+
+test("medium passages enter exhaustive section analysis instead of waiting for 18k characters", () => {
+  assert.equal(LONG_FORM_THRESHOLD, 3_200);
+  assert.equal(CACHE_SCHEMA_VERSION, "analysis-v2");
 });
 
 test("cache material ignores display-only density but includes model-affecting settings", () => {
