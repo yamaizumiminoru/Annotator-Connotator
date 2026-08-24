@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fixtures = require("./fixtures/long-form-cases.json");
 const {
   AnalysisCancelledError,
+  DEFAULT_CHUNK_LENGTH,
   PartialAnalysisError,
   mergeChunkResults,
   runChunkPipeline,
@@ -33,6 +34,18 @@ test("splits realistic English and Japanese long-form fixtures without losing so
       if (index > 0) assert.equal(chunks[index - 1].end, chunk.start);
     });
   }
+});
+
+test("default splitting exhaustively scans medium lecture passages in several sections", () => {
+  const sentence = "Researchers compare child-language examples, corpora, recurring patterns, and competing explanations before drawing conclusions. ";
+  const source = sentence.repeat(65).trim();
+  const chunks = splitTextRanges(source);
+
+  assert.equal(DEFAULT_CHUNK_LENGTH, 3_200);
+  assert.ok(source.length > DEFAULT_CHUNK_LENGTH);
+  assert.ok(chunks.length >= 2);
+  assert.equal(chunks.map((chunk) => chunk.text).join(""), source);
+  assert.ok(chunks.every((chunk) => chunk.text.length <= DEFAULT_CHUNK_LENGTH));
 });
 
 test("prefers Japanese sentence boundaries even when punctuation is not followed by whitespace", () => {
