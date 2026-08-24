@@ -482,6 +482,27 @@ select {
 .dot.grammar { background: #a16daf; }
 .dot.nuance { background: #c5523c; }
 
+.legend-help {
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: help;
+}
+
+.legend-help:hover,
+.legend-help:focus-visible {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  outline: none;
+}
+
 .panel {
   display: none;
 }
@@ -550,10 +571,12 @@ select {
   filter: saturate(1.35);
 }
 
-.hl-vocab { background: var(--vocab-bg); color: var(--vocab-fg); }
-.hl-phrase { background: var(--phrase-bg); color: var(--phrase-fg); }
+.hl-word,
+.hl-term { background: var(--vocab-bg); color: var(--vocab-fg); }
+.hl-collocation,
+.hl-formula { background: var(--phrase-bg); color: var(--phrase-fg); }
 .hl-idiom { background: var(--idiom-bg); color: var(--idiom-fg); }
-.hl-grammar { background: var(--grammar-bg); color: var(--grammar-fg); }
+.hl-construction { background: var(--grammar-bg); color: var(--grammar-fg); }
 
 .nuance-inline {
   box-shadow: inset 0 -2px 0 var(--accent-2);
@@ -673,10 +696,12 @@ select {
   white-space: nowrap;
 }
 
-.badge.vocab { background: var(--vocab-bg); color: var(--vocab-fg); }
-.badge.phrase { background: var(--phrase-bg); color: var(--phrase-fg); }
+.badge.word,
+.badge.term { background: var(--vocab-bg); color: var(--vocab-fg); }
+.badge.collocation,
+.badge.formula { background: var(--phrase-bg); color: var(--phrase-fg); }
 .badge.idiom { background: var(--idiom-bg); color: var(--idiom-fg); }
-.badge.grammar { background: var(--grammar-bg); color: var(--grammar-fg); }
+.badge.construction { background: var(--grammar-bg); color: var(--grammar-fg); }
 .badge.nuance { background: var(--nuance-bg); color: var(--nuance-fg); }
 
 .badge-group {
@@ -686,10 +711,13 @@ select {
   gap: 5px;
 }
 
-.badge.nuance-secondary {
-  border: 1px solid #dfb4aa;
-  background: transparent;
-  color: var(--nuance-fg);
+.category-help {
+  cursor: help;
+}
+
+.category-help:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
 }
 
 .word-card p {
@@ -697,6 +725,34 @@ select {
   color: var(--muted);
   line-height: 1.6;
   font-size: 13px;
+}
+
+.word-card .meaning,
+.popup-def {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.construction-core {
+  font-weight: 800;
+}
+
+.annotation-pattern,
+.popup-pattern {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.annotation-pattern[hidden],
+.popup-pattern[hidden] {
+  display: none;
+}
+
+.annotation-pattern code,
+.popup-pattern code {
+  color: var(--grammar-fg);
+  font-family: inherit;
+  font-weight: 700;
 }
 
 .word-card {
@@ -724,6 +780,28 @@ select {
   margin-bottom: 3px;
 }
 
+.nuance-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+
+.word-card-head > .nuance-meta {
+  justify-content: flex-end;
+  margin-bottom: 0;
+}
+
+.nuance-confidence {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.confidence-high { color: #176c50; }
+.confidence-low { color: #8b5b25; }
+
 .word-card .nuance-row,
 .popup .nuance-row {
   color: var(--muted);
@@ -742,6 +820,11 @@ select {
 .word-card .nuance-summary,
 .popup .nuance-summary {
   color: var(--nuance-fg);
+}
+
+.word-card .nuance-gloss,
+.popup .nuance-gloss {
+  color: var(--text);
 }
 
 .nuance-detail-1 {
@@ -808,6 +891,7 @@ select {
 }
 
 .popup-def,
+.popup-pattern,
 .popup-note,
 .popup-ex {
   margin: 0 0 11px;
@@ -820,6 +904,25 @@ select {
 
 .popup-nuances .nuance-block {
   margin-top: 4px;
+}
+
+.category-glossary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin-top: 8px;
+}
+
+.category-glossary h3 {
+  margin: 0 0 3px;
+  font-size: 13px;
+}
+
+.category-glossary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .popup-note {
@@ -836,6 +939,10 @@ select {
 }
 
 @media (max-width: 860px) {
+  .category-glossary {
+    grid-template-columns: 1fr;
+  }
+
   .app-shell {
     padding: 10px;
   }

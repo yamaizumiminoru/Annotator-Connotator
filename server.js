@@ -1,8 +1,19 @@
 const http = require("http");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 const packageJson = require("./package.json");
+const {
+  buildCoverageCompletionPrompt,
+  candidateDiscoveryTarget,
+  completionLimit,
+  findLaterCoverageReview,
+  mergeUniqueNonOverlappingAnnotations,
+  selectAnnotationsByDensity,
+  stripInternalSelectionFields,
+  wholePassageSelectionRules,
+} = require("./lib/annotation-selection");
 
 const root = __dirname;
 loadDotEnv(path.join(root, ".env"));
@@ -13,6 +24,9 @@ const preciseModel = process.env.OPENAI_PRECISE_MODEL || process.env.OPENAI_MODE
 const reasoningEffort = process.env.OPENAI_REASONING_EFFORT || "low";
 const textVerbosity = process.env.OPENAI_TEXT_VERBOSITY || "low";
 let youtubeTranscriptModulePromise;
+const annotationCandidateCache = new Map();
+const candidateCacheTtlMs = 20 * 60 * 1000;
+const candidateCacheMaxEntries = 12;
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -219,12 +233,6 @@ function levelPrompt(level) {
   return table[level] || table.intermediate;
 }
 
-function densityTarget(density) {
-  if (density <= 1) return 7;
-  if (density >= 3) return 18;
-  return 12;
-}
-
 function focusPrompt(focus) {
   const table = {
     all: "Consider every analytical perspective: vocabulary, reusable phrases, idioms, grammar, register, stance, and pragmatic nuance. This does not mean annotating every word. Include only pedagogically useful targets.",
@@ -313,7 +321,7 @@ function languageName(code, fallback = "Japanese") {
 }
 
 function buildAnnotationPrompt(payload) {
-  const maxItems = densityTarget(Number(payload.density || 2));
+  const discoveryTarget = candidateDiscoveryTarget(payload.text);
   const includeGrammar = payload.includeGrammar !== false;
   const includeSlash = payload.includeSlash !== false;
   const sourceLanguage = languageName(payload.sourceLanguage, "auto-detected source language");
@@ -333,7 +341,7 @@ function buildAnnotationPrompt(payload) {
     "",
     `Target level: ${levelPrompt(payload.level)}`,
     `Focus: ${focusPrompt(payload.focus)}`,
-    `Annotation budget: up to ${maxItems} items. Return fewer when the text does not contain that many useful targets.`,
+    ...wholePassageSelectionRules(discoveryTarget),
     includeGrammar
       ? "Include grammar items when they are useful."
       : "Do not include grammar-only items unless essential.",
@@ -353,12 +361,16 @@ function buildAnnotationPrompt(payload) {
     "    {",
     '      "id": "a1",',
     '      "text": "exact substring from sourceText",',
-    '      "type": "vocab|phrase|idiom|grammar",',
+    '      "type": "word|collocation|formula|construction|idiom|term",',
     '      "meaningJa": "meaning in the selected explanation language",',
     '      "noteJa": "why it matters or how to use it",',
     '      "example": "short example in the source language when possible",',
+    '      "pattern": "generalized reusable pattern such as not only A, but also B, or an empty string",',
+    '      "coreRanges": [{"start": 0, "end": 8}],',
     '      "start": 0,',
-    '      "end": 10',
+    '      "end": 10,',
+    '      "priority": 5,',
+    '      "reliability": "high|medium|low"',
     "    }",
     "  ],",
     '  "connotations": [',
@@ -374,7 +386,7 @@ function buildAnnotationPrompt(payload) {
     '      "literalMeaning": "surface or dictionary meaning in the explanation language",',
     '      "suggestedMeaning": "meaning a listener may infer in the explanation language",',
     '      "pragmaticEffect": "social or discourse effect in the explanation language",',
-    '      "contextNote": "conditions, uncertainty, or competing readings in the explanation language",',
+    '      "contextNote": "genuine learner-relevant ambiguity, warning, or qualification in the explanation language, or an empty string",',
     '      "confidence": "high|medium|low",',
     '      "alternatives": ["another plausible interpretation in the explanation language"],',
     '      "evidence": ["source or contextual clue supporting the interpretation"],',
@@ -388,10 +400,16 @@ function buildAnnotationPrompt(payload) {
     "- Every annotation text must be an exact contiguous substring of sourceText.",
     "- start and end must be JavaScript string offsets for that exact substring.",
     "- Prefer useful learning targets over rare trivia.",
-    "- Never pad the annotation list to reach the budget.",
+    "- priority is an integer from 5 (essential/highest learner benefit) to 1 (supplementary but still level-appropriate). Assign it by pedagogical usefulness, reusability, and relevance to the selected focus.",
+    "- reliability expresses confidence that the span and explanation are correct. It is secondary to pedagogical priority and must not promote obvious but low-value dictionary items.",
+    "- Return ordinary annotation candidates in descending priority order, using reliability only as a secondary ordering consideration.",
+    "- Never pad the ordinary candidate list to reach the discovery target.",
     "- Treat the target level as a knowledge floor. Assume the learner already knows words and structures comfortably below that level, and omit them.",
-    "- Density changes the maximum number of useful items, never the difficulty threshold. Even at the highest density, omit material below the target level.",
+    "- Display density is applied by the server after candidate discovery. Do not lower the difficulty threshold or change candidate eligibility based on density.",
     "- Each annotation must offer a concrete learning benefit at the selected target level. If noteJa cannot explain that benefit without stating an elementary dictionary fact, omit the annotation.",
+    "- Use ordinary type word for a standalone lexical item, collocation for words that characteristically occur together, formula for a conventional reusable expression, construction for a grammatical frame, idiom for a non-compositional expression, and term for domain-specific terminology.",
+    "- Keep meaningJa to a short independent gloss. Keep noteJa compact and reference-like. When writing Japanese, use concise plain style and avoid desu/masu endings.",
+    "- For a reusable construction inside a longer annotation span, set pattern to its generalized frame and coreRanges to the non-overlapping JavaScript offsets within annotation text that mark the structural core. Use an empty pattern and empty coreRanges when no such display is useful.",
     "- Do not annotate an elementary pronoun, article, simple copula, punctuation mark, or isolated function word unless it is genuinely difficult at the target level or participates in a larger construction worth explaining.",
     "- Prefer the complete reusable phrase or construction over a trivial single word contained inside it.",
     "- Do not annotate overlapping spans.",
@@ -408,6 +426,8 @@ function buildAnnotationPrompt(payload) {
     "- For contextual irony, highlight the ironic expression itself and cite the conflicting context in evidence; do not include the setup merely to make the irony visible.",
     "- Examples of span selection: highlight 'childish' rather than the full sentence that positively reframes it; highlight 'kids' and optionally 'children' rather than the full sentence contrasting their registers; highlight 'Great job' rather than the preceding failure that makes it ironic.",
     "- Add only connotations that are useful to a learner and supported by the wording or context.",
+    "- Ordinary annotations and connotations may overlap in expression and supporting explanation when that helps each card stand independently; do not force a rigid theoretical separation between the two card types.",
+    "- Ordinary-annotation distribution rules do not apply to connotations. Keep connotation selection sparse and precision-first; never add one merely to cover a passage region.",
     "- Return an empty connotations array when there is no grounded nuance to explain.",
     "- Do not relabel ordinary dictionary meaning, lexical entailment, or a routine real-world association as connotation.",
     "- A merely possible association is not enough. Prefer an empty array unless the wording creates a meaningful evaluative, social, interpersonal, stance, presuppositional, ironic, euphemistic, or inferential contrast for a learner.",
@@ -416,6 +436,9 @@ function buildAnnotationPrompt(payload) {
     "- For a rhetorical question that mainly asserts an evaluation or position, prefer stance or evaluative as the primary category and implicature as a secondary category when useful.",
     "- Never present a cancellable conversational implicature as a logically entailed meaning.",
     "- When context is insufficient, explain the uncertainty or alternatives instead of selecting one reading as certain.",
+    "- Keep evidence concise and genuinely evidential. Do not restate the whole passage.",
+    "- Set contextNote to an empty string unless there is a genuine learner-relevant ambiguity, likely misunderstanding, or important qualification. Do not use it merely to repeat literal versus figurative wording.",
+    "- Keep alternatives empty unless there are genuinely competing plausible interpretations; synonyms or paraphrases of the main reading are not alternatives.",
     "- Do not invent hostility, discrimination, irony, emotion, personality, or political position.",
     "- For politeness, use subtype positive, negative, mitigation, honorific, or other. These are practical labels, not universal cultural claims.",
     "- Every connotation property shown in the schema is required. Use an empty alternatives array when no useful alternative exists.",
@@ -434,6 +457,74 @@ function buildAnnotationPrompt(payload) {
   ].join("\n");
 }
 
+async function completeLaterAnnotations({
+  text,
+  payload,
+  annotations,
+  sourceLanguage,
+  annotationModel,
+}) {
+  const review = findLaterCoverageReview(text, annotations);
+  if (!review) {
+    return {
+      annotations,
+      usage: null,
+      telemetry: { attempted: false, added: 0 },
+    };
+  }
+
+  const reviewText = text.slice(review.start, review.end);
+  const limit = completionLimit(candidateDiscoveryTarget(text));
+  const data = await callOpenAI([
+    {
+      role: "system",
+      content: buildCoverageCompletionPrompt({
+        sourceLanguage: languageName(sourceLanguage, sourceLanguage || "auto-detected source language"),
+        explanationLanguage: languageName(payload.explanationLanguage, "Japanese"),
+        targetLevel: levelPrompt(payload.level),
+        focus: focusPrompt(payload.focus),
+        limit,
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        precedingContext: text.slice(Math.max(0, review.start - 300), review.start),
+        reviewText,
+        existingTargets: annotations.map((item) => item.text),
+      }, null, 2),
+    },
+  ], 5000, { jsonObject: true, model: annotationModel });
+  const parsed = await parseOrRepairJson(extractText(data), "later annotation coverage review");
+  const localAnnotations = filterLowValueAnnotations(
+    repairAnnotationOffsets(reviewText, parsed.annotations),
+    payload.level,
+    sourceLanguage,
+  );
+  const shiftedAnnotations = repairAnnotationOffsets(text, localAnnotations.map((item) => ({
+    ...item,
+    start: item.start + review.start,
+    end: item.end + review.start,
+  })));
+  const merged = mergeUniqueNonOverlappingAnnotations(annotations, shiftedAnnotations);
+  const existingRanges = new Set(annotations.map((item) => `${item.start}:${item.end}:${item.text}`));
+  const added = merged.filter((item) => !existingRanges.has(`${item.start}:${item.end}:${item.text}`)).length;
+
+  return {
+    annotations: merged,
+    usage: data.usage || null,
+    telemetry: {
+      attempted: true,
+      completed: true,
+      reviewStart: review.start,
+      reviewStartPosition: Number((review.start / text.length).toFixed(3)),
+      latestInitialAnnotationPosition: Number(review.latestAnnotationPosition.toFixed(3)),
+      candidates: shiftedAnnotations.length,
+      added,
+    },
+  };
+}
+
 function loadYouTubeTranscriptModule() {
   if (!youtubeTranscriptModulePromise) {
     youtubeTranscriptModulePromise = import("@hallelx/youtube-transcript");
@@ -446,6 +537,54 @@ function validateAnnotationPayload(payload) {
   if (!text) return "text is required";
   if (text.length > 20000) return "text is too long; keep it under 20000 characters";
   return "";
+}
+
+function annotationCacheKey(text, payload, annotationModel) {
+  return crypto.createHash("sha256").update(JSON.stringify({
+    text,
+    sourceLanguage: payload.sourceLanguage || "auto",
+    explanationLanguage: payload.explanationLanguage || "ja",
+    level: payload.level || "intermediate",
+    focus: payload.focus || "all",
+    includeGrammar: payload.includeGrammar !== false,
+    includeSlash: payload.includeSlash !== false,
+    connotationTargets: payload.connotationTargets || [],
+    annotationModel,
+  })).digest("hex");
+}
+
+function getCachedCandidateResult(key) {
+  const cached = annotationCandidateCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.createdAt > candidateCacheTtlMs) {
+    annotationCandidateCache.delete(key);
+    return null;
+  }
+  annotationCandidateCache.delete(key);
+  annotationCandidateCache.set(key, cached);
+  return cached;
+}
+
+function setCachedCandidateResult(key, value) {
+  annotationCandidateCache.set(key, { createdAt: Date.now(), ...value });
+  while (annotationCandidateCache.size > candidateCacheMaxEntries) {
+    annotationCandidateCache.delete(annotationCandidateCache.keys().next().value);
+  }
+}
+
+function finalizeAnnotationResponse(candidateResult, payload, api) {
+  const result = JSON.parse(JSON.stringify(candidateResult));
+  const candidates = Array.isArray(result.annotations) ? result.annotations : [];
+  const displayed = selectAnnotationsByDensity(candidates, payload.density)
+    .map(stripInternalSelectionFields);
+  result.annotations = displayed;
+  result._api = {
+    ...api,
+    density: Number(payload.density) <= 1 ? "low" : Number(payload.density) >= 3 ? "high" : "standard",
+    candidateCount: candidates.length,
+    displayedAnnotationCount: displayed.length,
+  };
+  return result;
 }
 
 async function handleAnnotate(req, res) {
@@ -474,10 +613,26 @@ async function handleAnnotate(req, res) {
   const text = String(payload.text).trim();
   const analysisMode = payload.analysisMode === "precise" ? "precise" : "standard";
   const annotationModel = analysisMode === "precise" ? preciseModel : standardModel;
+  const hasConnotationTargets = Array.isArray(payload.connotationTargets)
+    && payload.connotationTargets.length > 0;
+  const cacheKey = annotationCacheKey(text, payload, annotationModel);
+  if (!hasConnotationTargets) {
+    const cached = getCachedCandidateResult(cacheKey);
+    if (cached) {
+      sendJson(res, 200, finalizeAnnotationResponse(cached.result, payload, {
+        model: annotationModel,
+        analysisMode,
+        usage: null,
+        candidateCacheHit: true,
+        coverageCompletion: cached.coverageCompletion,
+      }));
+      return;
+    }
+  }
 
   try {
     const data = await callOpenAI([
-      { role: "system", content: buildAnnotationPrompt(payload) },
+      { role: "system", content: buildAnnotationPrompt({ ...payload, text }) },
       {
         role: "user",
         content: JSON.stringify({
@@ -490,10 +645,13 @@ async function handleAnnotate(req, res) {
 
     const parsed = await parseOrRepairJson(extractText(data), "annotation result");
     parsed.sourceText = text;
-    parsed.annotations = filterLowValueAnnotations(
-      repairAnnotationOffsets(text, parsed.annotations),
-      payload.level,
-      parsed.sourceLanguage || payload.sourceLanguage,
+    parsed.annotations = mergeUniqueNonOverlappingAnnotations(
+      [],
+      filterLowValueAnnotations(
+        repairAnnotationOffsets(text, parsed.annotations),
+        payload.level,
+        parsed.sourceLanguage || payload.sourceLanguage,
+      ),
     );
     parsed.connotations = normalizeConnotations(text, parsed.connotations);
     parsed.sourceLanguage = parsed.sourceLanguage || payload.sourceLanguage || "auto";
@@ -501,17 +659,38 @@ async function handleAnnotate(req, res) {
     parsed.translation = parsed.translation || "";
     parsed.level = payload.level || parsed.level || "intermediate";
     let usage = data.usage || null;
+    let coverageCompletion = { attempted: false, added: 0 };
+    if (!hasConnotationTargets) {
+      try {
+        const completion = await completeLaterAnnotations({
+          text,
+          payload,
+          annotations: parsed.annotations,
+          sourceLanguage: parsed.sourceLanguage,
+          annotationModel,
+        });
+        parsed.annotations = completion.annotations;
+        coverageCompletion = completion.telemetry;
+        if (completion.usage) usage = mergeUsage([usage, completion.usage]);
+      } catch {
+        coverageCompletion = { attempted: true, completed: false, added: 0 };
+      }
+    }
     if (needsJapaneseTranslationRepair(parsed.explanationLanguage, parsed.translation)) {
       const repaired = await repairJapaneseTranslation(text, parsed.translation, annotationModel);
       parsed.translation = repaired.translation;
       usage = mergeUsage([usage, repaired.usage]);
     }
-    parsed._api = {
+    if (!hasConnotationTargets) {
+      setCachedCandidateResult(cacheKey, { result: parsed, coverageCompletion });
+    }
+    sendJson(res, 200, finalizeAnnotationResponse(parsed, payload, {
       model: annotationModel,
       analysisMode,
       usage,
-    };
-    sendJson(res, 200, parsed);
+      candidateCacheHit: false,
+      coverageCompletion,
+    }));
   } catch (error) {
     sendJson(res, 502, {
       error: error.status ? "openai_request_failed" : "annotation_failed",

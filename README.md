@@ -46,7 +46,7 @@ variable on the host.
 - Lets you choose a UI language.
 - Shows a full translation in the selected explanation language.
 - Adjusts extraction difficulty: beginner, intermediate, advanced.
-- Adjusts annotation density.
+- Discovers level-appropriate candidates across the full passage, ranks them by pedagogical priority, and then adjusts annotation density.
 - Switches between faster standard analysis with Luna and optional precise analysis with Sol.
 - Offers all, speaking, and academic perspectives without treating the item budget as a quota. Grammar inclusion remains a separate checkbox.
 - Sends the passage to the local server endpoint `POST /api/annotate`.
@@ -56,6 +56,26 @@ variable on the host.
 - Covers evaluative nuance, stance, politeness, implicature, presupposition, register, irony, and euphemism.
 - Highlights the smallest useful anchor expression while preserving wider contrast and discourse conditions in the context and evidence fields.
 - Lets the learner switch nuance detail between brief, standard, and detailed without discarding the richer API result.
+
+## Annotation Selection And Density
+
+Ordinary annotations are selected in three stages: full-passage candidate discovery, global ranking, and density filtering. The candidate discovery target scales with source length instead of using a fixed whole-passage 7 / 12 / 18 cap. Every candidate remains subject to the selected learner-level knowledge floor; longer input or higher density never permits elementary padding.
+
+The model assigns internal `priority` and `reliability` values to ordinary annotations. Pedagogical usefulness, reusability, and focus relevance determine priority; reliability is only a secondary ordering signal. Low, standard, and high density display 40%, 70%, and 100% of the same ranked candidate pool. The pool is cached for 20 minutes when only density changes, so low is a subset of standard and standard is a subset of high within that pool. A fresh model generation can still produce a different pool.
+
+For longer passages, the server checks whether candidate offsets are implausibly concentrated near the beginning. If so, it reviews the substantial uncovered tail once, using the same difficulty floor, and merges only non-duplicate, non-overlapping eligible candidates before global ranking. The review may return nothing. This coverage fallback and density filtering apply only to ordinary annotations; Connotator remains sparse and precision-first.
+
+## Learner-Facing Cards
+
+Ordinary annotation cards use learner-facing types such as word, collocation, formula, construction, idiom, and technical term. Their short gloss is visually quoted and the explanation prompt requests compact reference style, including plain-style Japanese. Construction candidates can include a generalized `pattern` plus annotation-relative `coreRanges`, allowing reusable elements such as `not only` and `but also` to be emphasized inside a longer source span.
+
+Connotation cards keep the rich API fields but show a smaller default set: category badges and confidence, a compact gloss, connotation, effect in context, and concise evidence. Context warnings and competing interpretations appear only in the detailed view when present; `conventionality` remains available in JSON but is hidden from the normal card. Category badges include descriptions, and the legend provides a compact category glossary.
+
+Run the deterministic regression tests with:
+
+```powershell
+npm.cmd test
+```
 
 ## Connotator Output
 

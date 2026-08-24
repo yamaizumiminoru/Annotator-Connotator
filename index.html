@@ -150,7 +150,9 @@
           <span><i class="dot phrase"></i><span data-i18n="expression">表現</span></span>
           <span><i class="dot idiom"></i><span data-i18n="idiom">イディオム</span></span>
           <span><i class="dot grammar"></i><span data-i18n="grammar">構文</span></span>
-          <span><i class="dot nuance"></i><span data-i18n="nuance">ニュアンス</span></span>
+          <span><i class="dot nuance"></i><span data-i18n="nuance">ニュアンス</span>
+            <button class="legend-help" id="categoryGlossaryBtn" type="button" aria-label="ニュアンスカテゴリの説明" title="ニュアンスカテゴリの説明" data-i18n-aria="categoryGlossaryOpen" data-i18n-title="categoryGlossaryOpen">?</button>
+          </span>
         </div>
 
         <section class="panel active" id="panel-annotated">
@@ -197,6 +199,7 @@
       <p class="popup-word" id="popupWord"></p>
       <span class="popup-type" id="popupType"></span>
       <p class="popup-def" id="popupDef"></p>
+      <p class="popup-pattern" id="popupPattern"><strong></strong> <code></code></p>
       <p class="popup-note" id="popupNote"></p>
       <p class="popup-ex" id="popupExample"></p>
       <div class="popup-nuances" id="popupNuances"></div>
@@ -204,6 +207,7 @@
   </div>
 
   <script src="./languages.js"></script>
+  <script src="./card-presentation.js"></script>
   <script src="./script.js"></script>
 </body>
 </html>

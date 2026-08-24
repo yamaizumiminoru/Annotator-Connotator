@@ -4,7 +4,8 @@ const sampleText = `大学に入ったら、専門性・個性・学識を身に
 
 const languageCatalog = window.LANGUAGE_CATALOG || [];
 const baseUiText = window.UI_TEXT || {};
-const uiTextCacheVersion = "4";
+const cardPresentation = window.CARD_PRESENTATION;
+const uiTextCacheVersion = "5";
 
 const state = {
   level: "intermediate",
@@ -20,10 +21,12 @@ const state = {
 };
 
 const typeTextKeys = {
-  vocab: "vocab",
-  phrase: "expression",
+  word: "wordType",
+  collocation: "collocationType",
+  formula: "formulaType",
+  construction: "constructionType",
   idiom: "idiom",
-  grammar: "grammar",
+  term: "termType",
 };
 
 const levelTextKeys = {
@@ -93,11 +96,13 @@ const els = {
   statGrammar: document.getElementById("statGrammar"),
   statNuance: document.getElementById("statNuance"),
   statLevel: document.getElementById("statLevel"),
+  categoryGlossaryBtn: document.getElementById("categoryGlossaryBtn"),
   overlay: document.getElementById("overlay"),
   popupClose: document.getElementById("popupClose"),
   popupWord: document.getElementById("popupWord"),
   popupType: document.getElementById("popupType"),
   popupDef: document.getElementById("popupDef"),
+  popupPattern: document.getElementById("popupPattern"),
   popupNote: document.getElementById("popupNote"),
   popupExample: document.getElementById("popupExample"),
   popupNuances: document.getElementById("popupNuances"),
@@ -169,6 +174,7 @@ function init() {
   els.copyJsonBtn.addEventListener("click", copyJson);
   els.copyMarkdownBtn.addEventListener("click", copyMarkdown);
   els.speakBtn.addEventListener("click", toggleSpeech);
+  els.categoryGlossaryBtn.addEventListener("click", openCategoryGlossary);
   els.overlay.addEventListener("click", (event) => {
     if (event.target === els.overlay) closePopup();
   });
@@ -517,16 +523,21 @@ function normalizeResult(data, fallbackText) {
   const annotations = Array.isArray(data.annotations) ? data.annotations : [];
   const connotations = Array.isArray(data.connotations) ? data.connotations : [];
   const normalized = annotations
-    .map((item, index) => ({
-      id: item.id || `a${index + 1}`,
-      text: String(item.text || "").trim(),
-      type: normalizeType(item.type),
-      meaningJa: String(item.meaningJa || item.meaning || "").trim(),
-      noteJa: String(item.noteJa || item.note || "").trim(),
-      example: String(item.example || "").trim(),
-      start: Number.isInteger(item.start) ? item.start : null,
-      end: Number.isInteger(item.end) ? item.end : null,
-    }))
+    .map((item, index) => {
+      const text = String(item.text || "").trim();
+      return {
+        id: item.id || `a${index + 1}`,
+        text,
+        type: normalizeType(item.type),
+        meaningJa: String(item.meaningJa || item.meaning || "").trim(),
+        noteJa: String(item.noteJa || item.note || "").trim(),
+        example: String(item.example || "").trim(),
+        pattern: String(item.pattern || "").trim(),
+        coreRanges: cardPresentation.resolveCoreRanges(text, item.pattern, item.coreRanges),
+        start: Number.isInteger(item.start) ? item.start : null,
+        end: Number.isInteger(item.end) ? item.end : null,
+      };
+    })
     .filter((item) => item.text && item.meaningJa);
 
   const normalizedConnotations = connotations
@@ -572,8 +583,7 @@ function normalizeResult(data, fallbackText) {
 }
 
 function normalizeType(type) {
-  if (["vocab", "phrase", "idiom", "grammar"].includes(type)) return type;
-  return "vocab";
+  return cardPresentation.normalizeAnnotationType(type);
 }
 
 function normalizeConnotationScope(scope) {
@@ -752,12 +762,17 @@ function renderWordList() {
         <span class="badge ${item.type}"></span>
       </div>
       <p class="meaning"></p>
+      <p class="annotation-pattern"><strong></strong> <code></code></p>
       <p class="note"></p>
       <p class="example"></p>
     `;
-    card.querySelector("h3").textContent = item.text;
+    renderAnnotationTitle(card.querySelector("h3"), item);
     card.querySelector(".badge").textContent = t(typeTextKeys[item.type]);
-    card.querySelector(".meaning").textContent = item.meaningJa;
+    card.querySelector(".meaning").textContent = cardPresentation.quoteGloss(item.meaningJa, state.uiLanguage);
+    const pattern = card.querySelector(".annotation-pattern");
+    pattern.hidden = !item.pattern;
+    pattern.querySelector("strong").textContent = t("patternLabel");
+    pattern.querySelector("code").textContent = item.pattern;
     card.querySelector(".note").textContent = item.noteJa;
     card.querySelector(".example").textContent = item.example ? `${t("examplePrefix")}${item.example}` : "";
     if (related.length) card.appendChild(renderNuanceBlock(related));
@@ -773,10 +788,33 @@ function renderWordList() {
     head.className = "word-card-head";
     const title = document.createElement("h3");
     title.textContent = connotation.text;
-    head.append(title, renderCategoryBadges(connotation));
-    card.append(head, renderNuanceBlock([connotation], { hideCategory: true }));
+    head.append(title, renderNuanceMeta(connotation));
+    card.append(head, renderNuanceBlock([connotation], { hideMeta: true }));
     card.addEventListener("click", () => openConnotationPopup(connotation.id));
     els.wordList.appendChild(card);
+  }
+}
+
+function renderAnnotationTitle(parent, annotation) {
+  parent.innerHTML = "";
+  if (!annotation.coreRanges.length) {
+    parent.textContent = annotation.text;
+    return;
+  }
+
+  let cursor = 0;
+  for (const range of annotation.coreRanges) {
+    if (range.start > cursor) {
+      parent.appendChild(document.createTextNode(annotation.text.slice(cursor, range.start)));
+    }
+    const core = document.createElement("strong");
+    core.className = "construction-core";
+    core.textContent = annotation.text.slice(range.start, range.end);
+    parent.appendChild(core);
+    cursor = range.end;
+  }
+  if (cursor < annotation.text.length) {
+    parent.appendChild(document.createTextNode(annotation.text.slice(cursor)));
   }
 }
 
@@ -842,44 +880,69 @@ function renderNuanceBlock(connotations, options = {}) {
     const entry = document.createElement("section");
     entry.className = "nuance-entry";
 
-    if (!options.hideCategory) {
-      entry.appendChild(renderCategoryBadges(connotation));
+    if (!options.hideMeta) {
+      entry.appendChild(renderNuanceMeta(connotation));
     }
 
     if (detail === 1) {
-      appendNuanceRow(entry, "", connotation.suggestedMeaning, "nuance-summary");
+      appendNuanceRow(entry, "nuanceSuggested", connotation.suggestedMeaning, "nuance-summary");
     } else {
-      appendNuanceRow(entry, "nuanceSurface", connotation.literalMeaning);
+      appendNuanceRow(
+        entry,
+        "nuanceSurface",
+        cardPresentation.quoteGloss(connotation.literalMeaning, state.uiLanguage),
+        "nuance-gloss",
+      );
       appendNuanceRow(entry, "nuanceSuggested", connotation.suggestedMeaning, "nuance-summary");
       appendNuanceRow(entry, "nuanceEffect", connotation.pragmaticEffect);
-      appendNuanceRow(entry, "nuanceContext", connotation.contextNote);
+      appendNuanceRow(entry, "nuanceEvidence", connotation.evidence.join(" / "));
     }
 
     if (detail >= 3) {
-      appendNuanceRow(entry, "nuanceAlternatives", connotation.alternatives.join(" / "));
-      appendNuanceRow(entry, "nuanceEvidence", connotation.evidence.join(" / "));
-      appendNuanceRow(entry, "nuanceConfidence", t(`confidence${capitalize(connotation.confidence)}`));
-      appendNuanceRow(entry, "nuanceConventionality", t(connotation.conventionality));
+      if (cardPresentation.shouldShowQualification(connotation.contextNote, [
+        connotation.literalMeaning,
+        connotation.suggestedMeaning,
+        connotation.pragmaticEffect,
+      ])) {
+        appendNuanceRow(entry, "nuanceContext", connotation.contextNote);
+      }
+      const alternatives = cardPresentation.meaningfulAlternatives(connotation.alternatives, [
+        connotation.literalMeaning,
+        connotation.suggestedMeaning,
+      ]);
+      appendNuanceRow(entry, "nuanceAlternatives", alternatives.join(" / "));
     }
     block.appendChild(entry);
   }
   return block;
 }
 
+function renderNuanceMeta(connotation) {
+  const meta = document.createElement("div");
+  meta.className = "nuance-meta";
+  meta.appendChild(renderCategoryBadges(connotation));
+
+  const confidence = document.createElement("span");
+  confidence.className = `nuance-confidence confidence-${connotation.confidence}`;
+  confidence.textContent = `${t("nuanceConfidence")}: ${t(`confidence${capitalize(connotation.confidence)}`)}`;
+  meta.appendChild(confidence);
+  return meta;
+}
+
 function renderCategoryBadges(connotation) {
   const group = document.createElement("span");
   group.className = "badge-group";
+  group.setAttribute("aria-label", t("categoryGlossaryLabel"));
 
-  const primary = document.createElement("span");
-  primary.className = "badge nuance";
-  primary.textContent = `${t("primaryCategory")}: ${t(connotation.category)}`;
-  group.appendChild(primary);
-
-  for (const category of connotation.secondaryCategories || []) {
-    const secondary = document.createElement("span");
-    secondary.className = "badge nuance-secondary";
-    secondary.textContent = `${t("secondaryCategory")}: ${t(category)}`;
-    group.appendChild(secondary);
+  for (const category of [connotation.category, ...(connotation.secondaryCategories || [])]) {
+    const badge = document.createElement("span");
+    const help = t(`categoryHelp${capitalize(category)}`);
+    badge.className = "badge nuance category-help";
+    badge.textContent = t(category);
+    badge.title = help;
+    badge.tabIndex = 0;
+    badge.setAttribute("aria-label", `${t(category)}: ${help}`);
+    group.appendChild(badge);
   }
   return group;
 }
@@ -929,9 +992,11 @@ function renderExportJson() {
 function updateStats() {
   const items = state.result?.annotations || [];
   const connotations = state.result?.connotations || [];
-  els.statVocab.textContent = items.filter((item) => item.type === "vocab").length;
-  els.statPhrase.textContent = items.filter((item) => item.type === "phrase" || item.type === "idiom").length;
-  els.statGrammar.textContent = items.filter((item) => item.type === "grammar").length;
+  els.statVocab.textContent = items.filter((item) => item.type === "word" || item.type === "term").length;
+  els.statPhrase.textContent = items.filter((item) => (
+    item.type === "collocation" || item.type === "formula" || item.type === "idiom"
+  )).length;
+  els.statGrammar.textContent = items.filter((item) => item.type === "construction").length;
   els.statNuance.textContent = connotations.length;
   els.statLevel.textContent = t(levelTextKeys[state.level] || "intermediate");
 }
@@ -940,10 +1005,14 @@ function openPopup(id) {
   const item = state.annotationsById.get(id);
   if (!item) return;
   const related = state.connotationsByAnnotationId.get(item.id) || [];
-  els.popupWord.textContent = item.text;
+  renderAnnotationTitle(els.popupWord, item);
   els.popupType.textContent = t(typeTextKeys[item.type]);
   els.popupType.className = `popup-type badge ${item.type}`;
-  els.popupDef.textContent = item.meaningJa;
+  els.popupType.hidden = false;
+  els.popupDef.textContent = cardPresentation.quoteGloss(item.meaningJa, state.uiLanguage);
+  els.popupPattern.hidden = !item.pattern;
+  els.popupPattern.querySelector("strong").textContent = t("patternLabel");
+  els.popupPattern.querySelector("code").textContent = item.pattern;
   els.popupNote.textContent = item.noteJa;
   els.popupExample.textContent = item.example ? `${t("examplePrefix")}${item.example}` : "";
   els.popupNuances.innerHTML = "";
@@ -955,13 +1024,37 @@ function openConnotationPopup(id) {
   const item = state.connotationsById.get(id);
   if (!item) return;
   els.popupWord.textContent = item.text;
-  els.popupType.textContent = t("nuance");
-  els.popupType.className = "popup-type badge nuance";
+  els.popupType.hidden = true;
   els.popupDef.textContent = "";
+  els.popupPattern.hidden = true;
   els.popupNote.textContent = "";
   els.popupExample.textContent = "";
   els.popupNuances.innerHTML = "";
   els.popupNuances.appendChild(renderNuanceBlock([item]));
+  els.overlay.classList.add("show");
+}
+
+function openCategoryGlossary() {
+  els.popupWord.textContent = t("categoryGlossaryTitle");
+  els.popupType.hidden = true;
+  els.popupDef.textContent = "";
+  els.popupPattern.hidden = true;
+  els.popupNote.textContent = "";
+  els.popupExample.textContent = "";
+  els.popupNuances.innerHTML = "";
+
+  const glossary = document.createElement("div");
+  glossary.className = "category-glossary";
+  for (const category of connotationCategoryValues) {
+    const item = document.createElement("section");
+    const heading = document.createElement("h3");
+    const description = document.createElement("p");
+    heading.textContent = t(category);
+    description.textContent = t(`categoryHelp${capitalize(category)}`);
+    item.append(heading, description);
+    glossary.appendChild(item);
+  }
+  els.popupNuances.appendChild(glossary);
   els.overlay.classList.add("show");
 }
 

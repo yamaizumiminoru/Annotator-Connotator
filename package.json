@@ -1,11 +1,12 @@
 {
   "name": "annotator-connotator",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Multilingual annotation and connotation-aware language-learning studio",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check script.js"
+    "check": "node --check server.js && node --check script.js && node --check card-presentation.js && node --check lib/annotation-selection.js",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "@hallelx/youtube-transcript": "0.2.0"
