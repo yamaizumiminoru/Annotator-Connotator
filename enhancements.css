@@ -36,8 +36,17 @@
   box-shadow: 0 1px 4px rgb(31 36 40 / 12%);
 }
 
+.action-row {
+  flex-wrap: wrap;
+}
+
 .reanalyze-btn {
   white-space: nowrap;
+}
+
+#annotateBtn:disabled + .reanalyze-btn {
+  opacity: .55;
+  pointer-events: none;
 }
 
 @media (max-width: 520px) {
