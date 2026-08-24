@@ -60,6 +60,8 @@ variable on the host.
 - Lets the learner switch nuance detail between brief, standard, and detailed without discarding the richer API result.
 - Transparently analyzes long lecture and transcript input in ordered sections while preserving global source offsets.
 - Shows section-based progress for long-form work and lets the learner cancel without replacing the previous successful result.
+- Shows the completed analysis model/mode and aggregate input, output, and total token usage without making another OpenAI request.
+- Persists completed analyses locally in IndexedDB so unchanged work can be restored and reused without another paid model call.
 
 ## Long-Form Analysis
 
@@ -67,11 +69,19 @@ Text over 18,000 JavaScript characters is divided at paragraph, sentence, line, 
 
 The local safety ceiling is 250,000 characters. Actual latency and API usage grow with the number of sections. Cancelling aborts the current browser request and prevents later section calls; a provider request that has already started may still have consumed usage. A failed section is reported as a partial failure, and no incomplete result replaces the previous successful analysis.
 
+## Local Result Cache And Usage
+
+Completed analysis results are stored locally in browser IndexedDB. Cache identity includes the source text, source/explanation language, learner level, focus, grammar/slash settings, analysis mode, actual model, and cache-schema version. Display density is intentionally excluded from the identity because the richer ranked candidate pool can be filtered locally: low, standard, and high density therefore reuse the same eligible pool when a valid cached result is available.
+
+Reloading the app restores a matching saved result through the normal render path. Re-analyzing unchanged settings can also reuse the saved result without calling OpenAI. Use the **Re-run / 再解析** button when you explicitly want a fresh model generation; a fresh successful result replaces the saved entry for that exact analysis identity. Cache failures fall back to the normal server request rather than blocking analysis.
+
+The compact result metadata line shows the model, analysis mode, chunk count when applicable, and aggregate input/output/total token usage reported by the API. A result served from persistent browser cache is marked as a local-cache result. Token numbers on a cached result describe the original analysis that produced it; loading the cached result itself does not make another OpenAI request.
+
 ## Annotation Selection And Density
 
 Ordinary annotations are selected in three stages: full-passage candidate discovery, global ranking, and density filtering. The candidate discovery target scales with source length instead of using a fixed whole-passage 7 / 12 / 18 cap. Every candidate remains subject to the selected learner-level knowledge floor; longer input or higher density never permits elementary padding.
 
-The model assigns internal `priority` and `reliability` values to ordinary annotations. Pedagogical usefulness, reusability, and focus relevance determine priority; reliability is only a secondary ordering signal. Low, standard, and high density display 40%, 70%, and 100% of the same ranked candidate pool. The pool is cached for 20 minutes when only density changes, so low is a subset of standard and standard is a subset of high within that pool. A fresh model generation can still produce a different pool.
+The model assigns internal `priority` and `reliability` values to ordinary annotations. Pedagogical usefulness, reusability, and focus relevance determine priority; reliability is only a secondary ordering signal. Low, standard, and high density display 40%, 70%, and 100% of the same ranked candidate pool. The server keeps a short-lived in-memory candidate cache for immediate density changes, while the browser's persistent result cache can reuse the same ranked pool across reloads when the analysis identity still matches. A forced fresh model generation can still produce a different candidate pool.
 
 For longer passages, the server checks whether candidate offsets are implausibly concentrated near the beginning. If so, it reviews the substantial uncovered tail once, using the same difficulty floor, and merges only non-duplicate, non-overlapping eligible candidates before global ranking. The review may return nothing. This coverage fallback and density filtering apply only to ordinary annotations; Connotator remains sparse and precision-first.
 
