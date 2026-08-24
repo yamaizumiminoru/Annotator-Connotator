@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Annotator-Connotator</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./enhancements.css">
 </head>
 <body>
   <main class="app-shell">
@@ -145,6 +146,7 @@
             <small data-i18n="setting">設定</small>
           </div>
         </div>
+        <div class="analysis-meta" id="analysisMeta" hidden></div>
 
         <div class="legend" aria-label="Annotation legend">
           <span><i class="dot vocab"></i><span data-i18n="vocab">語彙</span></span>
@@ -209,6 +211,7 @@
 
   <script src="./languages.js"></script>
   <script src="./lib/analysis-core.js"></script>
+  <script src="./client-session.js"></script>
   <script src="./client-analysis.js"></script>
   <script src="./card-presentation.js"></script>
   <script src="./script.js"></script>
