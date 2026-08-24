@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { CACHE_SCHEMA_VERSION } = require("../lib/analysis-core.js");
 const {
   UI_ADDITIONS,
   applyDensityToCachedResult,
@@ -115,7 +116,7 @@ test("cached result can be re-filtered by density without exposing selection int
   const result = {
     annotations: [],
     _selection: {
-      version: "analysis-v1",
+      version: CACHE_SCHEMA_VERSION,
       candidates: [
         { id: "a1", text: "one", start: 0, end: 3, priority: 5, reliability: "high" },
         { id: "a2", text: "two", start: 4, end: 7, priority: 4, reliability: "high" },
