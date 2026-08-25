@@ -83,6 +83,7 @@
   root.addEventListener("load", () => {
     loadScript("./lib/reason-selection.js")
       .then(() => loadScript("./reason-selection-client.js"))
+      .then(() => loadScript("./reason-ui-localization.js"))
       .catch(() => {
         // Optional enhancement: the original app remains usable if these files fail to load.
       });
