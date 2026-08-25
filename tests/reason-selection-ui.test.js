@@ -61,11 +61,14 @@ test("reason tags are shown in cards and popup and preserved in export handlers"
   assert.match(source, /copyMarkdownBtn/);
 });
 
-test("runtime entrypoint patches legacy density selection and launch scripts use it", () => {
+test("runtime entrypoint keeps reason-tagged selection and adds the AI speech wrapper", () => {
   const server = fs.readFileSync(path.join(root, "server-reason-selection.js"), "utf8");
+  const ttsEntry = fs.readFileSync(path.join(root, "server-tts.js"), "utf8");
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   const launch = fs.readFileSync(path.join(root, "launch_app.ps1"), "utf8");
   assert.match(server, /selection\.selectAnnotationsByDensity = function selectReasonTaggedAnnotations/);
-  assert.equal(pkg.scripts.start, "node server-reason-selection.js");
-  assert.match(launch, /server-reason-selection\.js/);
+  assert.match(ttsEntry, /installTtsServerPatch/);
+  assert.match(ttsEntry, /server-reason-selection/);
+  assert.equal(pkg.scripts.start, "node server-tts.js");
+  assert.match(launch, /server-tts\.js/);
 });
