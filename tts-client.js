@@ -186,6 +186,7 @@
       if (deviceSpeaking) {
         root.speechSynthesis?.cancel();
         deviceSpeaking = false;
+        delete deviceButton.dataset.speaking;
         refreshUi(root, deviceButton, aiButton, voiceSelect);
         setUiStatus(root, ui(root, "ttsDeviceStopped", "Device speech stopped."), "");
         return;
@@ -200,16 +201,19 @@
       utterance.rate = DEVICE_SPEECH_RATE;
       utterance.onend = () => {
         deviceSpeaking = false;
+        delete deviceButton.dataset.speaking;
         refreshUi(root, deviceButton, aiButton, voiceSelect);
       };
       utterance.onerror = () => {
         deviceSpeaking = false;
+        delete deviceButton.dataset.speaking;
         refreshUi(root, deviceButton, aiButton, voiceSelect);
       };
       root.speechSynthesis.cancel();
       root.speechSynthesis.speak(utterance);
       deviceSpeaking = true;
-      deviceButton.textContent = `Ⅱ ${ui(root, "deviceSpeech", "Device speech")}`;
+      deviceButton.dataset.speaking = "true";
+      refreshUi(root, deviceButton, aiButton, voiceSelect);
       setUiStatus(root, ui(root, "ttsDevicePlaying", "Playing device speech at 1.00× speed..."), "ok");
     }, { capture: true });
 
@@ -220,15 +224,18 @@
       }
       root.speechSynthesis?.cancel();
       deviceSpeaking = false;
+      delete deviceButton.dataset.speaking;
       const text = sourceText.value.trim();
       if (!text) return;
 
       const language = resolvedAiLanguage(root, sourceLanguage, text, lastDetectedLanguage);
       if (!language) {
+        refreshUi(root, deviceButton, aiButton, voiceSelect);
         setUiStatus(root, ui(root, "ttsLanguageUnknown", "Select or detect the source language first."), "error");
         return;
       }
       if (!isSupportedTtsLanguage(language)) {
+        refreshUi(root, deviceButton, aiButton, voiceSelect);
         setUiStatus(root, ui(root, "ttsLanguageUnsupported", "AI speech does not support {language}.", {
           language: languageDisplayName(root, language),
         }), "error");
@@ -240,9 +247,11 @@
       if (!chunks.length) return;
       aiRunning = true;
       const serial = ++runSerial;
-      aiAbortController = new AbortController();
-      aiButton.textContent = `■ ${ui(root, "aiSpeech", "AI speech")}`;
+      const controller = new AbortController();
+      aiAbortController = controller;
+      aiButton.dataset.speaking = "true";
       voiceSelect.disabled = true;
+      refreshUi(root, deviceButton, aiButton, voiceSelect);
 
       try {
         let completed = 0;
@@ -257,7 +266,7 @@
             text: chunk,
             language,
             voice,
-            signal: aiAbortController.signal,
+            signal: controller.signal,
           });
           if (!audio.cached) generated += 1;
           completed += 1;
@@ -270,7 +279,7 @@
           return audio.blob;
         });
 
-        if (serial !== runSerial || aiAbortController.signal.aborted) return;
+        if (serial !== runSerial || controller.signal.aborted) return;
         if (generated === 0) {
           setUiStatus(root, ui(root, "ttsAiCacheHit", "Playing saved AI speech from the local cache."), "ok");
         } else {
@@ -278,7 +287,7 @@
         }
 
         for (const blob of results) {
-          if (serial !== runSerial || aiAbortController.signal.aborted) return;
+          if (serial !== runSerial || controller.signal.aborted) return;
           await playAudioBlob(root, blob, serial);
         }
         if (serial === runSerial) {
@@ -299,6 +308,7 @@
         if (serial === runSerial) {
           aiRunning = false;
           aiAbortController = null;
+          delete aiButton.dataset.speaking;
           releaseCurrentAudio();
           voiceSelect.disabled = false;
           refreshUi(root, deviceButton, aiButton, voiceSelect);
@@ -321,6 +331,7 @@
       aiAbortController?.abort();
       aiAbortController = null;
       aiRunning = false;
+      delete aiButton.dataset.speaking;
       releaseCurrentAudio();
       voiceSelect.disabled = false;
       refreshUi(root, deviceButton, aiButton, voiceSelect);
@@ -386,10 +397,8 @@
   function refreshUi(root, deviceButton, aiButton, voiceSelect) {
     const deviceLabel = ui(root, "deviceSpeech", "Device speech");
     const aiLabel = ui(root, "aiSpeech", "AI speech");
-    if (deviceButton.textContent?.startsWith("Ⅱ")) deviceButton.textContent = `Ⅱ ${deviceLabel}`;
-    else deviceButton.textContent = `▶ ${deviceLabel}`;
-    if (aiButton.textContent?.startsWith("■")) aiButton.textContent = `■ ${aiLabel}`;
-    else aiButton.textContent = `✨ ${aiLabel}`;
+    deviceButton.textContent = `${deviceButton.dataset.speaking === "true" ? "Ⅱ" : "▶"} ${deviceLabel}`;
+    aiButton.textContent = `${aiButton.dataset.speaking === "true" ? "■" : "✨"} ${aiLabel}`;
     deviceButton.title = ui(root, "deviceSpeechTitle", "Play with the device/browser voice at 1.00× speed");
     aiButton.title = ui(root, "aiSpeechTitle", "AI-generated speech; matching audio is cached locally.");
     deviceButton.setAttribute("aria-label", deviceButton.title);
