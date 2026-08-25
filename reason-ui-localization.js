@@ -4,6 +4,7 @@
   if (root?.document) api.install(root);
 }(typeof globalThis !== "undefined" ? globalThis : this, () => {
   const UI_TEXT_CACHE_VERSION = "5";
+  const JAPANESE_APP_TITLE = "あの手ーターこの手ーター";
   const REASON_BADGES = {
     "reason-hard-word": "reasonHardWord",
     "reason-idiomatic": "reasonIdiomatic",
@@ -51,6 +52,10 @@
     if (root.__reasonUiLocalizationInstalled) return;
     root.__reasonUiLocalizationInstalled = true;
 
+    if (root.UI_TEXT && root.UI_TEXT.ja) {
+      root.UI_TEXT.ja.appTitle = JAPANESE_APP_TITLE;
+    }
+
     const select = root.document.getElementById("uiLangSelect");
     const originalT = typeof root.t === "function" ? root.t : null;
     const inFlight = new Map();
@@ -73,6 +78,11 @@
       const fallback = root.UI_TEXT?.en?.[key] || root.UI_TEXT?.ja?.[key] || key;
       return interpolate(fallback, values);
     };
+
+    if (currentLanguage() === "ja") {
+      const appTitle = root.document.querySelector('[data-i18n="appTitle"]');
+      if (appTitle) appTitle.textContent = JAPANESE_APP_TITLE;
+    }
 
     function relocalizeReasonBadges() {
       for (const [className, key] of Object.entries(REASON_BADGES)) {
@@ -141,6 +151,7 @@
 
   return {
     UI_TEXT_CACHE_VERSION,
+    JAPANESE_APP_TITLE,
     cacheKey,
     install,
     interpolate,
