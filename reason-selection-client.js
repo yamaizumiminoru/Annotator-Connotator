@@ -218,8 +218,30 @@
 
   function requestLocalRedisplay() {
     if (!lastFullResult) return;
-    const button = root.document.getElementById("annotateBtn");
-    if (button && !button.disabled) button.click();
+    const levels = selectedLevels();
+    const density = Number(root.document.getElementById("densityRange")?.value || 2);
+    const displayed = transformResult(lastFullResult, levels, density, { localReasonCache: true });
+    rememberDisplayed(displayed);
+
+    // This script is loaded after script.js, so these global lexical bindings are available here.
+    // Update the current UI state directly instead of clicking Analyze, which would make a local
+    // filter change look like (and potentially become) a fresh paid analysis.
+    try {
+      state.result = normalizeResult(
+        displayed,
+        root.document.getElementById("sourceText")?.value?.trim() || displayed.sourceText || "",
+      );
+      renderResult();
+      if (typeof setStatus === "function" && typeof t === "function") {
+        setStatus(t("extracted", {
+          count: state.result.annotations.length,
+          nuances: state.result.connotations.length,
+        }), "ok");
+      }
+    } catch {
+      // Never fall back to triggering analysis for a display-only setting change.
+    }
+    scheduleUiRefresh();
   }
 
   function transformResult(full, levels, density, flags = {}) {
