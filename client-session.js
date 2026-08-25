@@ -464,21 +464,6 @@
     root.document.getElementById("uiLangSelect")?.addEventListener("change", () => {
       root.setTimeout(renderMetadata, 0);
     });
-
-    root.addEventListener("load", () => {
-      root.setTimeout(async () => {
-        const payload = collectUiPayload(root);
-        if (!payload.text) return;
-        try {
-          const cached = await cachedResultForPayload(payload);
-          if (!cached) return;
-          const analyzeButton = root.document.getElementById("annotateBtn");
-          if (analyzeButton && !analyzeButton.disabled) analyzeButton.click();
-        } catch {
-          // Reload restoration is best-effort and never blocks the app.
-        }
-      }, 0);
-    });
   }
 
   return {
