@@ -11,6 +11,7 @@ const files = [
   "client-analysis.js",
   "client-session.js",
   "reason-selection-client.js",
+  "reason-ui-localization.js",
   "card-presentation.js",
   ...fs.readdirSync(path.join(root, "lib"))
     .filter((name) => name.endsWith(".js"))
