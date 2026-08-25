@@ -47,6 +47,26 @@ test("broad discovery prompt removes the hard learner floor but protects connota
   assert.doesNotMatch(broadened, /Treat the target level as a knowledge floor/);
 });
 
+test("discovery enumeration removes candidate quotas and ranking-based exclusion", () => {
+  const source = [
+    "Candidate discovery target: aim for about 24 eligible ordinary annotations when the passage supports them. This target scales with source length and is not the displayed density count.",
+    "Rank every eligible ordinary annotation by pedagogical priority across the whole passage, not first-come-first-served reading order.",
+    "When suitable targets occur in the beginning, middle, and end, include strong candidates from those regions in the globally ranked set.",
+    "Return fewer candidates when there are genuinely fewer suitable targets. Never pad the set to reach the target, and never lower the learner-level threshold.",
+    "- Prefer useful learning targets over rare trivia.",
+    "- Return ordinary annotation candidates in descending priority order, using reliability only as a secondary ordering consideration.",
+    "- Never pad the ordinary candidate list to reach the discovery target.",
+  ].join("\n");
+  const broadened = broadenAnnotationPrompt(source);
+  assert.match(broadened, /Enumerate every plausible ordinary annotation candidate/);
+  assert.match(broadened, /Do not target a particular number/);
+  assert.match(broadened, /Do not rank or exclude plausible ordinary candidates by pedagogical priority/);
+  assert.match(broadened, /There is no ordinary discovery quota/);
+  assert.doesNotMatch(broadened, /aim for about 24/);
+  assert.doesNotMatch(broadened, /descending priority order/);
+  assert.doesNotMatch(broadened, /globally ranked set/);
+});
+
 test("applies judgments to already-discovered candidates without changing their spans", () => {
   const annotations = [{ id: "a1", text: "brain plasticity", type: "term", start: 10, end: 26, priority: 3 }];
   const judgments = [{
