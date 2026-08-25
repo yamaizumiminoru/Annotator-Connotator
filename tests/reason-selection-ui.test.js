@@ -33,6 +33,25 @@ test("level and density changes redisplay the judged pool locally without clicki
   assert.doesNotMatch(localRedisplay, /fetch\(/);
 });
 
+test("nuance display slider only rerenders the current result locally", () => {
+  const source = fs.readFileSync(path.join(root, "script.js"), "utf8");
+  assert.match(source, /nuanceRange\.addEventListener\("input", updateNuanceLabel\)/);
+  const start = source.indexOf("function updateNuanceLabel(");
+  const end = source.indexOf("function setInputMode", start);
+  assert.ok(start >= 0 && end > start);
+  const nuanceRedisplay = source.slice(start, end);
+  assert.match(nuanceRedisplay, /renderAnnotatedText\(\)/);
+  assert.match(nuanceRedisplay, /renderWordList\(\)/);
+  assert.doesNotMatch(nuanceRedisplay, /annotate\s*\(/);
+  assert.doesNotMatch(nuanceRedisplay, /fetch\s*\(/);
+  assert.doesNotMatch(nuanceRedisplay, /\.click\s*\(/);
+});
+
+test("session cache never auto-clicks Analyze on page load", () => {
+  const source = fs.readFileSync(path.join(root, "client-session.js"), "utf8");
+  assert.doesNotMatch(source, /root\.addEventListener\("load"[\s\S]*?analyzeButton\.click\(\)/);
+});
+
 test("reason tags are shown in cards and popup and preserved in export handlers", () => {
   const source = fs.readFileSync(path.join(root, "reason-selection-client.js"), "utf8");
   assert.match(source, /reason-badge-group/);
