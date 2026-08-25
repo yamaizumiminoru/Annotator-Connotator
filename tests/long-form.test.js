@@ -4,6 +4,7 @@ const fixtures = require("./fixtures/long-form-cases.json");
 const {
   AnalysisCancelledError,
   DEFAULT_CHUNK_LENGTH,
+  MAX_CHUNK_CONCURRENCY,
   PartialAnalysisError,
   mergeChunkResults,
   runChunkPipeline,
@@ -122,12 +123,74 @@ test("merges chunk results with global offsets, source order, usage, and duplica
   assert.equal(merged.usage.total_tokens, 27);
 });
 
+test("runs at most five chunks concurrently and still returns source order", async () => {
+  assert.equal(MAX_CHUNK_CONCURRENCY, 5);
+  const chunks = Array.from({ length: 6 }, (_, index) => ({ index }));
+  const started = [];
+  let active = 0;
+  let maxActive = 0;
+  let releaseFirstWave;
+  let notifyFirstWaveStarted;
+  const firstWaveGate = new Promise((resolve) => { releaseFirstWave = resolve; });
+  const firstWaveStarted = new Promise((resolve) => { notifyFirstWaveStarted = resolve; });
+
+  const resultPromise = runChunkPipeline({
+    chunks,
+    analyzeChunk: async (chunk) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      started.push(chunk.index);
+      if (started.length === MAX_CHUNK_CONCURRENCY) notifyFirstWaveStarted();
+      try {
+        if (chunk.index < MAX_CHUNK_CONCURRENCY) await firstWaveGate;
+        return { chunk, usage: { total_tokens: 1 } };
+      } finally {
+        active -= 1;
+      }
+    },
+  });
+
+  await firstWaveStarted;
+  assert.deepEqual(started, [0, 1, 2, 3, 4]);
+  assert.equal(maxActive, 5);
+  releaseFirstWave();
+
+  const result = await resultPromise;
+  assert.deepEqual(result.map((item) => item.chunk.index), [0, 1, 2, 3, 4, 5]);
+  assert.equal(maxActive, 5);
+});
+
+test("parallel failure stops assigning later chunks and retains completed in-flight usage", async () => {
+  const started = [];
+  await assert.rejects(runChunkPipeline({
+    chunks: [{ index: 0 }, { index: 1 }, { index: 2 }, { index: 3 }],
+    maxConcurrency: 2,
+    analyzeChunk: async (chunk) => {
+      started.push(chunk.index);
+      if (chunk.index === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        throw new Error("parallel fixture failure");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return { usage: { input_tokens: 3, output_tokens: 2, total_tokens: 5 } };
+    },
+  }), (error) => {
+    assert.ok(error instanceof PartialAnalysisError);
+    assert.equal(error.failedChunk, 1);
+    assert.equal(error.completedChunks, 1);
+    assert.equal(error.usage.total_tokens, 5);
+    return true;
+  });
+  assert.deepEqual(started, [0, 1]);
+});
+
 test("cancellation stops subsequent chunks and reports completed work", async () => {
   const controller = new AbortController();
   let calls = 0;
   await assert.rejects(runChunkPipeline({
     chunks: [{ index: 0 }, { index: 1 }, { index: 2 }],
     signal: controller.signal,
+    maxConcurrency: 1,
     analyzeChunk: async () => {
       calls += 1;
       controller.abort();
@@ -145,6 +208,7 @@ test("partial failure is explicit and retains usage from completed chunks", asyn
   let calls = 0;
   await assert.rejects(runChunkPipeline({
     chunks: [{ index: 0 }, { index: 1 }, { index: 2 }],
+    maxConcurrency: 1,
     analyzeChunk: async () => {
       calls += 1;
       if (calls === 2) throw new Error("fixture failure");
@@ -165,6 +229,7 @@ test("a transient section failure can be retried without repeating completed sec
   const progress = [];
   const result = await runChunkPipeline({
     chunks: [{ index: 0 }, { index: 1 }, { index: 2 }],
+    maxConcurrency: 1,
     maxAttempts: 2,
     analyzeChunk: async (chunk) => {
       calls.push(chunk.index);

@@ -90,7 +90,7 @@ if (Test-AppHealth $healthUrl $expectedVersion) {
   Write-Host "Starting Annotator-Connotator..."
   $process = Start-Process `
     -FilePath $node `
-    -ArgumentList "server.js" `
+    -ArgumentList "server-reason-selection.js" `
     -WorkingDirectory $AppDir `
     -RedirectStandardOutput $outLog `
     -RedirectStandardError $errLog `

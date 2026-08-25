@@ -68,3 +68,35 @@
 
   return { AnalysisResponseError, isCancellation, parseEvents, readProgressResponse };
 }));
+
+(function prepareReasonSelectionClient(root) {
+  if (!root?.document || typeof root.localStorage === "undefined") return;
+  const valid = new Set(["beginner", "intermediate", "advanced"]);
+  if (!root.localStorage.getItem("annotation.levels")) {
+    const legacy = root.localStorage.getItem("annotation.level");
+    const initial = valid.has(legacy) ? [legacy] : ["intermediate"];
+    root.localStorage.setItem("annotation.levels", JSON.stringify(initial));
+  }
+  // Keep the legacy single-level pipeline on its broadest setting; real selected bands travel separately.
+  root.localStorage.setItem("annotation.level", "beginner");
+
+  root.addEventListener("load", () => {
+    loadScript("./lib/reason-selection.js")
+      .then(() => loadScript("./reason-selection-client.js"))
+      .then(() => loadScript("./reason-ui-localization.js"))
+      .catch(() => {
+        // Optional enhancement: the original app remains usable if these files fail to load.
+      });
+  });
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = root.document.createElement("script");
+      script.src = src;
+      script.async = false;
+      script.onload = resolve;
+      script.onerror = reject;
+      root.document.body.appendChild(script);
+    });
+  }
+}(typeof globalThis !== "undefined" ? globalThis : window));

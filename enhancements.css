@@ -49,6 +49,68 @@
   pointer-events: none;
 }
 
+.level-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.level-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.level-checkbox:has(input:checked) {
+  border-color: #8c8164;
+  background: #f4f0e4;
+  font-weight: 650;
+}
+
+.level-checkbox input {
+  margin: 0;
+}
+
+.reason-badge-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.reason-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fbfaf5;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.reason-hard-word { border-style: solid; }
+.reason-idiomatic { border-style: dashed; }
+.reason-term { letter-spacing: .02em; }
+.reason-construction { border-radius: 5px; }
+
+#popupReasonTags {
+  margin: 4px 0 10px;
+  justify-content: flex-start;
+}
+
 @media (max-width: 520px) {
   .brand-row > div:first-child {
     min-height: 44px;
@@ -59,5 +121,14 @@
     width: 44px;
     height: 44px;
     border-radius: 10px;
+  }
+
+  .level-checkboxes {
+    gap: 5px;
+  }
+
+  .level-checkbox {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 }
