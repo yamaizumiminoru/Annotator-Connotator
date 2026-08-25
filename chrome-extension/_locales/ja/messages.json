@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "Annotator-Connotator"
+  },
+  "extensionDescription": {
+    "message": "Webページや文字選択できるPDFの選択範囲をAnnotator-Connotatorで開きます。"
+  },
+  "contextMenu": {
+    "message": "Annotator-Connotatorで開く"
+  }
+}
