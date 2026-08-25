@@ -20,6 +20,19 @@ test("reason-selection client turns the old single-choice level control into thr
   assert.match(source, /if \(!checked\.length\) event\.target\.checked = true/);
 });
 
+test("level and density changes redisplay the judged pool locally without clicking Analyze", () => {
+  const source = fs.readFileSync(path.join(root, "reason-selection-client.js"), "utf8");
+  const start = source.indexOf("function requestLocalRedisplay()");
+  const end = source.indexOf("function transformResult", start);
+  assert.ok(start >= 0 && end > start);
+  const localRedisplay = source.slice(start, end);
+  assert.match(localRedisplay, /transformResult\(lastFullResult, levels, density/);
+  assert.match(localRedisplay, /state\.result = normalizeResult/);
+  assert.match(localRedisplay, /renderResult\(\)/);
+  assert.doesNotMatch(localRedisplay, /\.click\(\)/);
+  assert.doesNotMatch(localRedisplay, /fetch\(/);
+});
+
 test("reason tags are shown in cards and popup and preserved in export handlers", () => {
   const source = fs.readFileSync(path.join(root, "reason-selection-client.js"), "utf8");
   assert.match(source, /reason-badge-group/);
