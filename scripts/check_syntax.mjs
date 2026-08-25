@@ -6,9 +6,11 @@ import { spawnSync } from "node:child_process";
 const root = path.resolve(import.meta.dirname, "..");
 const files = [
   "server.js",
+  "server-reason-selection.js",
   "script.js",
   "client-analysis.js",
   "client-session.js",
+  "reason-selection-client.js",
   "card-presentation.js",
   ...fs.readdirSync(path.join(root, "lib"))
     .filter((name) => name.endsWith(".js"))
