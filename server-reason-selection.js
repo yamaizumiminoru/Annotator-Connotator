@@ -42,6 +42,7 @@ selection.wholePassageSelectionRules = function broadWholePassageSelectionRules(
     ...base,
     "Ordinary candidate discovery is deliberately broad across beginner, intermediate, and advanced learning targets. Learner-band eligibility is decided in a separate contextual judge after discovery.",
     "Do not discard an expression merely because its component words look easy: idioms, phrasal verbs, metaphorical or extended senses, reusable constructions, and technical terms may still be valuable.",
+    "Actively look for phrasal verbs, idioms, fixed expressions, and nonliteral or extended uses. Do not omit them merely because their component words are basic or familiar.",
     "These broad-discovery rules apply only to ordinary annotations. Keep connotation discovery sparse, grounded, and precision-first.",
   ];
 };
