@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "Annotator-Connotator"
+  },
+  "extensionDescription": {
+    "message": "Open selected text from web pages or text-selectable PDFs in Annotator-Connotator."
+  },
+  "contextMenu": {
+    "message": "Open in Annotator-Connotator"
+  }
+}
