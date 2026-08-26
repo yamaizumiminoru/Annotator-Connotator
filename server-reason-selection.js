@@ -94,9 +94,7 @@ global.fetch = async function reasonAwareFetch(input, init = {}) {
       ? nativeFetch(input, { ...init, body: JSON.stringify(body) })
       : nativeFetch(input, init);
   }
-  if (isConnotationTargetTest) {
-    return nativeFetch(input, { ...init, body: JSON.stringify(body) });
-  }
+  if (isConnotationTargetTest) return nativeFetch(input, { ...init, body: JSON.stringify(body) });
 
   const modifiedBody = cloneJson(body);
   const originalUserPayload = parseUserPayload(modifiedBody);
