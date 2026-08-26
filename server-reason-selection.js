@@ -3,6 +3,7 @@ const { AsyncLocalStorage } = require("async_hooks");
 const selection = require("./lib/annotation-selection");
 const reasonSelection = require("./lib/reason-selection");
 const reasonJudge = require("./lib/reason-judge");
+const regionalDiscovery = require("./lib/regional-discovery");
 
 const requestContext = new AsyncLocalStorage();
 const nativeFetch = global.fetch.bind(global);
@@ -73,12 +74,34 @@ global.fetch = async function reasonAwareFetch(input, init = {}) {
   if (isConnotationTargetTest) return nativeFetch(input, init);
 
   const modifiedBody = cloneJson(body);
+  const originalUserPayload = parseUserPayload(modifiedBody);
+  const sourceText = isCompletion
+    ? String(originalUserPayload.reviewText || "")
+    : String(originalUserPayload.sourceText || "");
+  const scanRegions = isAnnotation
+    ? regionalDiscovery.buildScanRegions(sourceText)
+    : [];
+  const broadPrompt = isAnnotation
+    ? reasonJudge.broadenAnnotationPrompt(system)
+    : reasonJudge.broadenCoveragePrompt(system);
   rewriteSystemPrompt(
     modifiedBody,
     isAnnotation
-      ? reasonJudge.broadenAnnotationPrompt(system)
-      : reasonJudge.broadenCoveragePrompt(system),
+      ? regionalDiscovery.regionalizeAnnotationPrompt(broadPrompt, {
+          regions: scanRegions,
+          hardMaximum: selection.candidateDiscoveryTarget(sourceText),
+        })
+      : broadPrompt,
   );
+  if (isAnnotation) rewriteUserPayload(modifiedBody, {
+    ...originalUserPayload,
+    scanRegions: scanRegions.map((region) => ({
+      regionIndex: region.index + 1,
+      start: region.start,
+      end: region.end,
+      regionText: region.text,
+    })),
+  });
 
   const response = await nativeFetch(input, { ...init, body: JSON.stringify(modifiedBody) });
   if (!response.ok) return response;
@@ -96,12 +119,22 @@ global.fetch = async function reasonAwareFetch(input, init = {}) {
   } catch {
     return response;
   }
-  if (!Array.isArray(parsed.annotations) || !parsed.annotations.length) return response;
+  if (isAnnotation) {
+    const flattened = regionalDiscovery.flattenRegionalAnnotations(
+      sourceText,
+      scanRegions,
+      parsed.regions,
+    );
+    parsed.annotations = flattened.annotations;
+    parsed._regionalDiscovery = flattened.telemetry;
+    delete parsed.regions;
+  }
+  if (!Array.isArray(parsed.annotations) || !parsed.annotations.length) {
+    setOutputText(apiData, JSON.stringify(parsed));
+    return jsonResponseLike(response, apiData);
+  }
 
   const userPayload = parseUserPayload(modifiedBody);
-  const sourceText = isCompletion
-    ? String(userPayload.reviewText || "")
-    : String(userPayload.sourceText || "");
   if (!sourceText) return response;
 
   const surrounding = isCompletion
@@ -152,6 +185,12 @@ function parseUserPayload(body) {
   } catch {
     return {};
   }
+}
+
+function rewriteUserPayload(body, payload) {
+  const input = Array.isArray(body?.input) ? body.input : [];
+  const item = input.find((entry) => entry?.role === "user");
+  if (item) item.content = JSON.stringify(payload, null, 2);
 }
 
 async function callJudge(parentBody, parentInit, items) {
