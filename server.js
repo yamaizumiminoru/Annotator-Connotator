@@ -39,6 +39,12 @@ const {
   runChunkPipeline,
   splitTextRanges,
 } = require("./lib/long-form");
+const {
+  isTranslationEnabled,
+  normalizeTranslation,
+  shouldRepairTranslation,
+  translationPromptDirectives,
+} = require("./lib/translation-policy");
 
 const root = __dirname;
 loadDotEnv(path.join(root, ".env"));
@@ -332,6 +338,7 @@ function buildAnnotationPrompt(payload) {
   const discoveryTarget = candidateDiscoveryTarget(payload.text);
   const includeGrammar = payload.includeGrammar !== false;
   const includeSlash = payload.includeSlash !== false;
+  const translation = translationPromptDirectives(payload);
   const sourceLanguage = languageName(payload.sourceLanguage, "auto-detected source language");
   const explanationLanguage = languageName(payload.explanationLanguage, "Japanese");
   const connotationTargets = Array.isArray(payload.connotationTargets)
@@ -343,7 +350,7 @@ function buildAnnotationPrompt(payload) {
     "Return only one valid JSON object. Do not use markdown fences.",
     `Source language: ${sourceLanguage}.`,
     `Explanation language: ${explanationLanguage}.`,
-    `Write summaryJa, translation, meaningJa, and noteJa values in natural ${explanationLanguage}.`,
+    `Write ${translation.outputFields} values in natural ${explanationLanguage}.`,
     `Use only ${explanationLanguage} in explanatory prose. Quote source-language wording only when needed to identify or discuss it; never substitute an accidental word from an unrelated third language or script.`,
     "Keep the JSON property names exactly as specified even when the explanation language is not Japanese.",
     "",
@@ -352,7 +359,7 @@ function buildAnnotationPrompt(payload) {
     ...(payload.chunkContext
       ? [
           `This is section ${payload.chunkContext.index} of ${payload.chunkContext.total} in one longer document.`,
-          "Analyze and translate only sourceText. The neighboring context below is supplied only to interpret boundary-adjacent wording and must not be annotated, translated, or included in offsets.",
+          `${translation.chunkAction} The neighboring context below is supplied only to interpret boundary-adjacent wording and must not be annotated, translated, or included in offsets.`,
           `Preceding context: ${JSON.stringify(payload.chunkContext.before || "")}`,
           `Following context: ${JSON.stringify(payload.chunkContext.after || "")}`,
           "All returned offsets must be relative to this section's sourceText, starting at zero.",
@@ -365,6 +372,7 @@ function buildAnnotationPrompt(payload) {
     includeSlash
       ? "Also split the source into slash-reading chunks."
       : "Set slashReading to an empty array.",
+    ...(!translation.enabled ? translation.rules : []),
     "",
     "Schema:",
     "{",
@@ -373,7 +381,9 @@ function buildAnnotationPrompt(payload) {
     '  "explanationLanguage": "explanation language code or language name",',
     '  "level": "beginner|intermediate|advanced",',
     '  "summaryJa": "one short explanation-language sentence",',
-    '  "translation": "full sourceText translation in the selected explanation language",',
+    translation.enabled
+      ? '  "translation": "full sourceText translation in the selected explanation language",'
+      : '  "translation": "",',
     '  "annotations": [',
     "    {",
     '      "id": "a1",',
@@ -459,10 +469,9 @@ function buildAnnotationPrompt(payload) {
     "- Do not invent hostility, discrimination, irony, emotion, personality, or political position.",
     "- For politeness, use subtype positive, negative, mitigation, honorific, or other. These are practical labels, not universal cultural claims.",
     "- Every connotation property shown in the schema is required. Use an empty alternatives array when no useful alternative exists.",
-    "- Include a faithful full-passage translation in translation.",
-    "- Do not let the full translation replace the individual annotations.",
+    ...(translation.enabled ? translation.rules : []),
     "- Keep noteJa concise.",
-    `- Before returning, check translation, summaryJa, meaningJa, noteJa, and all connotation explanations for accidental words or script from a language other than ${explanationLanguage}.`,
+    `- Before returning, check ${translation.checkedFields} for accidental words or script from a language other than ${explanationLanguage}.`,
     "- If the source language is auto-detected, set sourceLanguage to the detected language.",
     ...(connotationTargets.length
       ? [
@@ -740,6 +749,7 @@ async function analyzePayload({ payload, text, signal, onProgress }) {
       sourceLanguage: payload.sourceLanguage || "auto",
       explanationLanguage: payload.explanationLanguage || "ja",
       level: payload.level || "intermediate",
+      includeTranslation: isTranslationEnabled(payload),
     });
     candidateResult = merged.result;
     usage = merged.usage;
@@ -803,7 +813,7 @@ async function analyzeSingleText({ text, payload, annotationModel, signal }) {
   parsed.connotations = normalizeConnotations(text, parsed.connotations);
   parsed.sourceLanguage = parsed.sourceLanguage || payload.sourceLanguage || "auto";
   parsed.explanationLanguage = parsed.explanationLanguage || payload.explanationLanguage || "ja";
-  parsed.translation = parsed.translation || "";
+  parsed.translation = normalizeTranslation(parsed.translation, payload);
   parsed.level = payload.level || parsed.level || "intermediate";
   let usage = mergeUsage([data.usage, parsedResult.usage]);
   let coverageCompletion = { attempted: false, added: 0 };
@@ -828,7 +838,9 @@ async function analyzeSingleText({ text, payload, annotationModel, signal }) {
       coverageCompletion = { attempted: true, completed: false, added: 0 };
     }
   }
-  if (needsJapaneseTranslationRepair(parsed.explanationLanguage, parsed.translation)) {
+  if (shouldRepairTranslation(payload, () => (
+    needsJapaneseTranslationRepair(parsed.explanationLanguage, parsed.translation)
+  ))) {
     const repaired = await repairJapaneseTranslation(text, parsed.translation, annotationModel, signal);
     parsed.translation = repaired.translation;
     usage = mergeUsage([usage, repaired.usage]);

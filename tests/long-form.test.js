@@ -123,6 +123,30 @@ test("merges chunk results with global offsets, source order, usage, and duplica
   assert.equal(merged.usage.total_tokens, 27);
 });
 
+test("long-form merge discards all chunk translations when translation is disabled", () => {
+  const source = "First section. Second section.";
+  const chunks = [
+    { index: 0, start: 0, end: 15, text: source.slice(0, 15) },
+    { index: 1, start: 15, end: source.length, text: source.slice(15) },
+  ];
+  const analyzed = chunks.map((chunk, index) => ({
+    chunk,
+    result: {
+      sourceLanguage: "en",
+      translation: index === 0 ? "第一部。" : "第二部。",
+      annotations: [],
+      connotations: [],
+      slashReading: [],
+    },
+  }));
+
+  const merged = mergeChunkResults(source, analyzed, {
+    explanationLanguage: "ja",
+    includeTranslation: false,
+  });
+  assert.equal(merged.result.translation, "");
+});
+
 test("runs at most five chunks concurrently and still returns source order", async () => {
   assert.equal(MAX_CHUNK_CONCURRENCY, 5);
   const chunks = Array.from({ length: 6 }, (_, index) => ({ index }));

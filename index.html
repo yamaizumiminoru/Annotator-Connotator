@@ -99,6 +99,7 @@
         <div class="toggle-grid">
           <label><input id="includeGrammar" type="checkbox" checked> <span data-i18n="includeGrammar">構文も拾う</span></label>
           <label><input id="includeSlash" type="checkbox" checked> <span data-i18n="includeSlash">スラッシュ読み</span></label>
+          <label><input id="includeTranslation" type="checkbox"> <span data-i18n="includeTranslation">翻訳を表示</span></label>
         </div>
 
         <div class="action-row">
@@ -171,7 +172,7 @@
             </div>
             <div class="inline-nuance-list" id="inlineNuanceList"></div>
           </section>
-          <article class="translation-card">
+          <article class="translation-card" id="translationCard" hidden>
             <h2 data-i18n="translationTitle">解説言語での翻訳</h2>
             <p id="translationText"></p>
           </article>

@@ -279,6 +279,7 @@
       focus: payload.focus || "all",
       includeGrammar: payload.includeGrammar !== false,
       includeSlash: payload.includeSlash !== false,
+      includeTranslation: payload.includeTranslation === true,
     });
   }
 

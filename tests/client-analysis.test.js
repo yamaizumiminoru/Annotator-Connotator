@@ -5,6 +5,7 @@ const {
   isCancellation,
   parseEvents,
   readProgressResponse,
+  shouldShowTranslation,
 } = require("../client-analysis");
 
 test("reads chunk progress and the final streamed result", async () => {
@@ -37,4 +38,11 @@ test("distinguishes partial failure and cancellation from an ordinary response",
   assert.equal(isCancellation(new Error("network"), controller.signal), true);
   assert.equal(isCancellation({ error: "analysis_cancelled" }), true);
   assert.equal(isCancellation(new Error("network")), false);
+});
+
+test("shows translation only when it is requested and nonempty", () => {
+  assert.equal(shouldShowTranslation(false, "翻訳"), false);
+  assert.equal(shouldShowTranslation(true, ""), false);
+  assert.equal(shouldShowTranslation(true, "   "), false);
+  assert.equal(shouldShowTranslation(true, "翻訳"), true);
 });

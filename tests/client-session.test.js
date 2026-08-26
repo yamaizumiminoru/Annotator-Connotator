@@ -5,6 +5,7 @@ const {
   UI_ADDITIONS,
   applyDensityToCachedResult,
   cacheMaterialString,
+  collectUiPayload,
   extractResultFromNdjson,
   forceRefreshInit,
   formatUsageMetadata,
@@ -81,16 +82,42 @@ test("cache material ignores density but changes with model and analytical setti
     focus: "all",
     includeGrammar: true,
     includeSlash: true,
+    includeTranslation: false,
     density: 1,
   };
   const low = cacheMaterialString(base, "gpt-5.6-luna");
   const high = cacheMaterialString({ ...base, density: 3 }, "gpt-5.6-luna");
   const advanced = cacheMaterialString({ ...base, level: "advanced" }, "gpt-5.6-luna");
+  const translated = cacheMaterialString({ ...base, includeTranslation: true }, "gpt-5.6-luna");
   const sol = cacheMaterialString(base, "gpt-5.6-sol");
 
   assert.equal(low, high);
   assert.notEqual(low, advanced);
+  assert.notEqual(low, translated);
   assert.notEqual(low, sol);
+});
+
+test("UI payload includes the strict translation checkbox setting", () => {
+  const elements = new Map([
+    ["sourceText", { value: " A useful passage. " }],
+    ["sourceLangSelect", { value: "en" }],
+    ["explanationLangSelect", { value: "ja" }],
+    ["densityRange", { value: "2" }],
+    ["focusSelect", { value: "all" }],
+    ["includeGrammar", { checked: true }],
+    ["includeSlash", { checked: false }],
+    ["includeTranslation", { checked: true }],
+  ]);
+  const root = {
+    document: {
+      getElementById: (id) => elements.get(id) || null,
+      querySelector: () => null,
+    },
+  };
+
+  assert.equal(collectUiPayload(root).includeTranslation, true);
+  elements.set("includeTranslation", { checked: false });
+  assert.equal(collectUiPayload(root).includeTranslation, false);
 });
 
 test("density selection reuses one ranked candidate pool monotonically", () => {

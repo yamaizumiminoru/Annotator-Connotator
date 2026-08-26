@@ -310,6 +310,7 @@
       focus: root.document.getElementById("focusSelect")?.value || "all",
       includeGrammar: root.document.getElementById("includeGrammar")?.checked !== false,
       includeSlash: root.document.getElementById("includeSlash")?.checked !== false,
+      includeTranslation: root.document.getElementById("includeTranslation")?.checked === true,
     };
   }
 

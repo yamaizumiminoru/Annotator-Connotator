@@ -39,16 +39,19 @@ test("cache material ignores display-only density but includes model-affecting s
     focus: "all",
     includeGrammar: true,
     includeSlash: true,
+    includeTranslation: false,
     analysisMode: "standard",
     model: "gpt-5.6-luna",
   };
   const low = stableSerialize(cacheMaterial({ ...base, density: 1, nuanceDetail: 1 }));
   const high = stableSerialize(cacheMaterial({ ...base, density: 3, nuanceDetail: 3 }));
   const precise = stableSerialize(cacheMaterial({ ...base, analysisMode: "precise", model: "gpt-5.6-sol" }));
+  const withTranslation = stableSerialize(cacheMaterial({ ...base, includeTranslation: true }));
   const nextSchema = stableSerialize(cacheMaterial({ ...base, version: `${CACHE_SCHEMA_VERSION}-next` }));
 
   assert.equal(low, high);
   assert.notEqual(low, precise);
+  assert.notEqual(low, withTranslation);
   assert.notEqual(low, nextSchema);
 });
 
