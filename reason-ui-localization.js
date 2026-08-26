@@ -107,6 +107,13 @@
       if (uiLanguageLabel) uiLanguageLabel.textContent = root.t("uiLanguage");
     }
 
+    function relocalizeQuestionUi() {
+      for (const element of root.document.querySelectorAll("[data-question-i18n]")) {
+        const key = element.dataset.questionI18n;
+        if (key) element.textContent = root.t(key);
+      }
+    }
+
     function relocalizeTtsControls() {
       const deviceButton = root.document.getElementById("speakBtn");
       const aiButton = root.document.getElementById("aiSpeakBtn");
@@ -156,6 +163,7 @@
 
     function relocalizeDynamicUi() {
       relocalizeStaticPolish();
+      relocalizeQuestionUi();
       relocalizeTtsControls();
       relocalizeReasonBadges();
       relocalizeServerPill();
