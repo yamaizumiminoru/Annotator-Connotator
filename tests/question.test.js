@@ -109,6 +109,7 @@ test("question client maps annotated selections to the nearest source occurrence
 
 test("question UI is explicit-only, supports a custom context menu and optional voice input", () => {
   const client = fs.readFileSync(path.join(root, "question-client.js"), "utf8");
+  const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const bootstrap = fs.readFileSync(path.join(root, "client-analysis.js"), "utf8");
   const entry = fs.readFileSync(path.join(root, "server-tts.js"), "utf8");
   assert.match(client, /addEventListener\("contextmenu"/);
@@ -117,7 +118,8 @@ test("question UI is explicit-only, supports a custom context menu and optional 
   assert.match(client, /SpeechRecognition \|\| root\.webkitSpeechRecognition/);
   assert.match(client, /submitButton\.addEventListener\("click", submitQuestion\)/);
   assert.doesNotMatch(client, /addEventListener\("load"[\s\S]{0,300}\/api\/question/);
-  assert.match(bootstrap, /question-client\.js/);
+  assert.match(index, /<script src="\.\/question-client\.js"><\/script>/);
+  assert.doesNotMatch(bootstrap, /loadScript\("\.\/question-client\.js"\)/);
   assert.match(entry, /installQuestionServerPatch/);
   assert.equal(isCostIncurringRequest("POST", "/api/question"), true);
 });
