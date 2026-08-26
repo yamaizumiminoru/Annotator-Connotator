@@ -4,10 +4,10 @@
   if (root?.document) api.install(root);
 }(typeof globalThis !== "undefined" ? globalThis : this, () => {
   const ENDPOINT = "/api/question";
+  const EXTENSION_MESSAGE_SOURCE = "annotator-connotator-extension";
   const UI_TEXT = {
     ja: {
-      questionMenu: "質問",
-      questionTitle: "あの手この手さんに聞く",
+      questionHint: "テキストを選択して右クリック → 質問",
       questionSelected: "選択した箇所",
       questionPlaceholder: "この箇所について質問を書く…",
       questionAsk: "質問する",
@@ -16,15 +16,13 @@
       questionListening: "聞いています…",
       questionThinking: "考えています…",
       questionUsedContext: "前後の文脈を確認して回答しました。",
-      questionSelectionOnly: "選択箇所だけで回答しました。",
       questionRequired: "質問を入力してください。",
       questionFailed: "回答を取得できませんでした。",
       questionApiKey: "OpenAI APIキーが設定されていません。",
       questionVoiceUnavailable: "このブラウザでは音声入力を利用できません。",
     },
     en: {
-      questionMenu: "Ask a question",
-      questionTitle: "Ask Annotator-Connotator",
+      questionHint: "Select text and right-click → Ask",
       questionSelected: "Selected passage",
       questionPlaceholder: "Ask about this passage…",
       questionAsk: "Ask",
@@ -33,7 +31,6 @@
       questionListening: "Listening…",
       questionThinking: "Thinking…",
       questionUsedContext: "Answered after checking the surrounding context.",
-      questionSelectionOnly: "Answered from the selected passage alone.",
       questionRequired: "Enter a question first.",
       questionFailed: "Could not get an answer.",
       questionApiKey: "No OpenAI API key is configured.",
@@ -62,31 +59,16 @@
     const style = root.document.createElement("style");
     style.id = "question-client-styles";
     style.textContent = `
-      .ac-question-menu {
-        position: fixed;
-        z-index: 10020;
-        min-width: 132px;
-        padding: 6px;
-        border: 1px solid rgba(0,0,0,.16);
-        border-radius: 9px;
-        background: Canvas;
-        color: CanvasText;
-        box-shadow: 0 10px 28px rgba(0,0,0,.18);
+      .ac-question-hint {
+        margin-left: auto;
+        color: var(--muted, #6f6f6f);
+        font-size: 11px;
+        font-weight: 500;
+        white-space: nowrap;
       }
-      .ac-question-menu[hidden] { display: none !important; }
-      .ac-question-menu button {
-        width: 100%;
-        border: 0;
-        border-radius: 6px;
-        padding: 8px 11px;
-        background: transparent;
-        color: inherit;
-        text-align: left;
-        cursor: pointer;
-        font: inherit;
+      @media (max-width: 760px) {
+        .ac-question-hint { flex-basis: 100%; margin-left: 0; margin-top: 4px; }
       }
-      .ac-question-menu button:hover,
-      .ac-question-menu button:focus-visible { background: color-mix(in srgb, CanvasText 9%, Canvas); outline: none; }
       .ac-question-backdrop {
         position: fixed;
         inset: 0;
@@ -108,9 +90,19 @@
         box-shadow: 0 24px 70px rgba(0,0,0,.28);
         padding: 18px;
       }
-      .ac-question-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
-      .ac-question-heading h2 { margin: 0; font-size: 1.08rem; }
-      .ac-question-close { border: 0; background: transparent; color: inherit; font-size: 1.35rem; cursor: pointer; padding: 3px 7px; }
+      .ac-question-heading {
+        display: flex;
+        justify-content: flex-end;
+        margin: -5px -6px 8px 0;
+      }
+      .ac-question-close {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-size: 1.35rem;
+        cursor: pointer;
+        padding: 3px 7px;
+      }
       .ac-question-label { margin: 0 0 6px; font-size: .82rem; font-weight: 700; opacity: .72; }
       .ac-question-selected {
         margin: 0 0 14px;
@@ -263,25 +255,22 @@
     let recognition = null;
     let rememberedSourceSelection = null;
     let rememberedAnnotatedSelection = null;
-    let pointerContextSelection = null;
-    let pointerContextObserved = false;
+    let lastRememberedSelection = null;
 
-    const menu = document.createElement("div");
-    menu.className = "ac-question-menu";
-    menu.hidden = true;
-    const menuButton = document.createElement("button");
-    menuButton.type = "button";
-    menuButton.dataset.questionI18n = "questionMenu";
-    menu.appendChild(menuButton);
-    document.body.appendChild(menu);
+    const legend = document.querySelector(".legend");
+    if (legend && !legend.querySelector(".ac-question-hint")) {
+      const hint = document.createElement("span");
+      hint.className = "ac-question-hint";
+      hint.dataset.questionI18n = "questionHint";
+      legend.appendChild(hint);
+    }
 
     const backdrop = document.createElement("div");
     backdrop.className = "ac-question-backdrop";
     backdrop.hidden = true;
     backdrop.innerHTML = `
-      <section class="ac-question-dialog" role="dialog" aria-modal="true" aria-labelledby="acQuestionTitle">
+      <section class="ac-question-dialog" role="dialog" aria-modal="true" aria-label="Question">
         <div class="ac-question-heading">
-          <h2 id="acQuestionTitle" data-question-i18n="questionTitle"></h2>
           <button class="ac-question-close" type="button" aria-label="Close">×</button>
         </div>
         <p class="ac-question-label" data-question-i18n="questionSelected"></p>
@@ -317,19 +306,6 @@
       micButton.setAttribute("aria-label", tr(root, "questionMic"));
     }
 
-    function hideMenu() {
-      menu.hidden = true;
-    }
-
-    function showMenu(x, y) {
-      localize();
-      menu.hidden = false;
-      const maxX = Math.max(8, root.innerWidth - 180);
-      const maxY = Math.max(8, root.innerHeight - 70);
-      menu.style.left = `${Math.min(Math.max(8, x), maxX)}px`;
-      menu.style.top = `${Math.min(Math.max(8, y), maxY)}px`;
-    }
-
     function closeDialog() {
       recognition?.abort?.();
       backdrop.hidden = true;
@@ -338,7 +314,6 @@
 
     function openDialog() {
       if (!activeSelection) return;
-      hideMenu();
       selectedBox.textContent = activeSelection.selectedText;
       questionInput.value = "";
       answerBox.textContent = "";
@@ -346,13 +321,6 @@
       backdrop.hidden = false;
       localize();
       root.setTimeout(() => questionInput.focus(), 0);
-    }
-
-    function currentSelection(event) {
-      const sourceText = sourceInput.value;
-      if (event.target === sourceInput) return selectionFromTextarea(sourceInput);
-      if (annotated.contains(event.target)) return selectionFromAnnotated(root, annotated, sourceText);
-      return null;
     }
 
     function selectionRegion(target) {
@@ -363,17 +331,48 @@
 
     function rememberSelection(region, snapshot) {
       if (!region || !snapshot) return;
-      const remembered = { snapshot, sourceText: sourceInput.value };
+      const remembered = { snapshot, sourceText: sourceInput.value, region };
       if (region === "source") rememberedSourceSelection = remembered;
       if (region === "annotated") rememberedAnnotatedSelection = remembered;
+      lastRememberedSelection = remembered;
     }
 
-    function validRememberedSelection(region) {
-      const remembered = region === "source" ? rememberedSourceSelection : rememberedAnnotatedSelection;
+    function validRememberedSelection(remembered) {
       if (!remembered || remembered.sourceText !== sourceInput.value) return null;
       const { snapshot } = remembered;
       if (!Number.isInteger(snapshot.start) || !Number.isInteger(snapshot.end)) return null;
       return sourceInput.value.slice(snapshot.start, snapshot.end) === snapshot.selectedText ? snapshot : null;
+    }
+
+    function currentSelectionForTarget(target) {
+      const sourceText = sourceInput.value;
+      if (target === sourceInput) return selectionFromTextarea(sourceInput);
+      if (annotated.contains(target)) return selectionFromAnnotated(root, annotated, sourceText);
+      return null;
+    }
+
+    function resolveExtensionSelection(selectedText) {
+      const selected = String(selectedText || "");
+      if (!selected.trim()) return null;
+
+      const liveSource = selectionFromTextarea(sourceInput);
+      if (liveSource?.selectedText === selected) return liveSource;
+      const liveAnnotated = selectionFromAnnotated(root, annotated, sourceInput.value);
+      if (liveAnnotated?.selectedText === selected) return liveAnnotated;
+
+      const rememberedCandidates = [
+        lastRememberedSelection,
+        rememberedSourceSelection,
+        rememberedAnnotatedSelection,
+      ];
+      for (const remembered of rememberedCandidates) {
+        const snapshot = validRememberedSelection(remembered);
+        if (snapshot?.selectedText === selected) return snapshot;
+      }
+
+      const approximateStart = validRememberedSelection(lastRememberedSelection)?.start || 0;
+      const offsets = resolveOffsets(sourceInput.value, selected, approximateStart);
+      return offsets ? { selectedText: selected, start: offsets.start, end: offsets.end } : null;
     }
 
     sourceInput.addEventListener("select", () => {
@@ -388,48 +387,28 @@
       rememberSelection("annotated", selectionFromAnnotated(root, annotated, sourceInput.value));
     });
 
+    // Preserve the exact selection before Chrome opens its native context menu.
+    // We deliberately do not call preventDefault(), so Copy/Search/Translate keep working.
     document.addEventListener("pointerdown", (event) => {
       if (event.button !== 2) return;
-      pointerContextObserved = true;
-      pointerContextSelection = currentSelection(event);
-      rememberSelection(selectionRegion(event.target), pointerContextSelection);
+      const region = selectionRegion(event.target);
+      rememberSelection(region, currentSelectionForTarget(event.target));
     }, { capture: true });
 
-    document.addEventListener("contextmenu", (event) => {
-      const pointerObserved = pointerContextObserved;
-      const pointerSelection = pointerContextSelection;
-      pointerContextObserved = false;
-      pointerContextSelection = null;
-      if (menu.contains(event.target) || backdrop.contains(event.target)) return;
-      const liveSelection = currentSelection(event);
-      const rememberedSelection = validRememberedSelection(selectionRegion(event.target));
-      const snapshot = chooseContextSelection(
-        liveSelection,
-        pointerSelection,
-        rememberedSelection,
-        pointerObserved,
-      );
-      if (!snapshot) {
-        hideMenu();
-        return;
-      }
-      event.preventDefault();
+    root.addEventListener("message", (event) => {
+      if (event.source !== root || event.origin !== root.location.origin) return;
+      const message = event.data;
+      if (message?.source !== EXTENSION_MESSAGE_SOURCE || message?.type !== "question") return;
+      const snapshot = resolveExtensionSelection(message.selectedText);
+      if (!snapshot) return;
       activeSelection = snapshot;
-      showMenu(event.clientX, event.clientY);
-    }, { capture: true });
-
-    document.addEventListener("pointerdown", (event) => {
-      if (!menu.hidden && !menu.contains(event.target)) hideMenu();
+      openDialog();
     });
 
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        hideMenu();
-        if (!backdrop.hidden) closeDialog();
-      }
+      if (event.key === "Escape" && !backdrop.hidden) closeDialog();
     });
 
-    menuButton.addEventListener("click", openDialog);
     closeButton.addEventListener("click", closeDialog);
     backdrop.addEventListener("pointerdown", (event) => {
       if (event.target === backdrop) closeDialog();
@@ -471,9 +450,7 @@
           throw new Error(data.detail || data.error || "question_failed");
         }
         answerBox.textContent = data.answer || "";
-        status.textContent = Number(data.contextRequests || 0) > 0
-          ? tr(root, "questionUsedContext")
-          : tr(root, "questionSelectionOnly");
+        status.textContent = tr(root, "questionUsedContext");
       } catch (error) {
         status.textContent = error?.code === "api_key_required"
           ? tr(root, "questionApiKey")
@@ -536,6 +513,7 @@
 
   return {
     ENDPOINT,
+    EXTENSION_MESSAGE_SOURCE,
     UI_TEXT,
     install,
     nearestOccurrence,
