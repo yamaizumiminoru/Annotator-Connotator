@@ -17,12 +17,12 @@ test("Japanese UI polish covers dynamic status and speech controls", () => {
   assert.match(source, /MutationObserver/);
 });
 
-test("question feature is loaded before final localization and browser import", () => {
-  const source = fs.readFileSync(path.join(root, "client-analysis.js"), "utf8");
-  const question = source.indexOf('loadScript("./question-client.js")');
-  const localization = source.indexOf('loadScript("./reason-ui-localization.js")');
-  const browserImport = source.indexOf('loadScript("./browser-import.js")');
-  assert.ok(question >= 0, "question-client.js should be loaded");
-  assert.ok(localization > question, "localization should run after question UI strings are installed");
-  assert.ok(browserImport > localization, "browser import should remain after localization");
+test("question feature is loaded directly after the base app", () => {
+  const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const bootstrap = fs.readFileSync(path.join(root, "client-analysis.js"), "utf8");
+  const baseApp = index.indexOf('<script src="./script.js"></script>');
+  const question = index.indexOf('<script src="./question-client.js"></script>');
+  assert.ok(baseApp >= 0, "base app should be loaded");
+  assert.ok(question > baseApp, "question-client.js should load directly after the base app");
+  assert.doesNotMatch(bootstrap, /loadScript\("\.\/question-client\.js"\)/);
 });
