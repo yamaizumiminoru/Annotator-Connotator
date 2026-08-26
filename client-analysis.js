@@ -84,6 +84,7 @@
     loadScript("./lib/reason-selection.js")
       .then(() => loadScript("./reason-selection-client.js"))
       .then(() => loadScript("./tts-client.js"))
+      .then(() => loadScript("./question-client.js"))
       .then(() => loadScript("./reason-ui-localization.js"))
       .then(() => loadScript("./browser-import.js"))
       .catch(() => {
