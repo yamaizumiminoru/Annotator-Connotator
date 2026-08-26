@@ -15,12 +15,14 @@ test("the app uses the Annotator-Connotator logo in the header and favicon", () 
   assert.ok(fs.statSync(logoPath).size > 0);
 });
 
-test("Japanese UI polish covers dynamic status and speech controls", () => {
+test("Japanese UI polish covers dynamic status, question hints, and speech controls", () => {
   const source = fs.readFileSync(path.join(root, "reason-ui-localization.js"), "utf8");
   assert.match(source, /uiLanguage:\s*"表示言語"/);
   assert.match(source, /serverReadyShort:\s*"LLM準備完了"/);
   assert.match(source, /serverKeyNeededShort:\s*"キー未設定"/);
   assert.match(source, /serverOfflineShort:\s*"オフライン"/);
+  assert.match(source, /relocalizeQuestionUi/);
+  assert.match(source, /\[data-question-i18n\]/);
   assert.match(source, /relocalizeTtsControls/);
   assert.match(source, /deviceSpeech/);
   assert.match(source, /aiSpeech/);
