@@ -46,7 +46,7 @@ test("browser import fills the input, clears the fragment, and never starts anal
   assert.equal(historyCalls[0][2], "/?v=0.8.0");
 });
 
-test("Chrome extension is a minimal selection-only Manifest V3 launcher", () => {
+test("Chrome extension keeps the native selection menu and bridges Ask back into the local app", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, "chrome-extension", "manifest.json"), "utf8"));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.version, "0.1.0");
@@ -61,13 +61,20 @@ test("Chrome extension is a minimal selection-only Manifest V3 launcher", () => 
   for (const iconPath of Object.values(manifest.icons)) {
     assert.equal(fs.existsSync(path.join(rootDir, "chrome-extension", iconPath)), true);
   }
+  assert.deepEqual(manifest.content_scripts[0].js, ["question-bridge.js"]);
+  assert.ok(manifest.content_scripts[0].matches.includes("http://localhost:4174/*"));
 
   const background = fs.readFileSync(path.join(rootDir, "chrome-extension", "background.js"), "utf8");
-  assert.match(background, /contexts:\s*\["selection"\]/);
+  const bridge = fs.readFileSync(path.join(rootDir, "chrome-extension", "question-bridge.js"), "utf8");
+  assert.match(background, /OPEN_MENU_ID/);
+  assert.match(background, /QUESTION_MENU_ID/);
+  assert.match(background, /documentUrlPatterns:\s*APP_PATTERNS/);
   assert.match(background, /info\.selectionText/);
   assert.match(background, /encodeURIComponent\(selectedText\)/);
-  assert.match(background, /http:\/\/localhost:4174\//);
   assert.match(background, /chrome\.tabs\.create/);
+  assert.match(background, /chrome\.tabs\.sendMessage/);
+  assert.match(bridge, /window\.postMessage/);
+  assert.match(bridge, /annotator-connotator-extension/);
   assert.doesNotMatch(background, /fetch\s*\(/);
 });
 
