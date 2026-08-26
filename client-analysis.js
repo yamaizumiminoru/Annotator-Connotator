@@ -80,22 +80,6 @@
   // Keep the legacy single-level pipeline on its broadest setting; real selected bands travel separately.
   root.localStorage.setItem("annotation.level", "beginner");
 
-  function loadQuestionClient() {
-    loadScript("./question-client.js")
-      .then(() => {
-        root.document.documentElement.dataset.questionClient = root.__questionClientInstalled ? "ready" : "loaded";
-      })
-      .catch(() => {
-        root.document.documentElement.dataset.questionClient = "error";
-      });
-  }
-
-  if (root.document.readyState === "loading") {
-    root.document.addEventListener("DOMContentLoaded", loadQuestionClient, { once: true });
-  } else {
-    loadQuestionClient();
-  }
-
   root.addEventListener("load", () => {
     loadScript("./lib/reason-selection.js")
       .then(() => loadScript("./reason-selection-client.js"))
