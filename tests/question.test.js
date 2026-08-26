@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const {
   CONTEXT_TOOL,
+  INITIAL_CONTEXT_SIDE_CHARS,
   answerQuestion,
   buildContextWindow,
   buildInitialQuestionInput,
@@ -33,17 +34,31 @@ test("context windows expose only the requested neighborhood around the selectio
   assert.equal(context.reachedEnd, false);
 });
 
-test("initial question input contains the selection and question but not the full source", () => {
-  const input = buildInitialQuestionInput({ selectedText: "selected phrase", question: "Why this tense?" });
+test("initial question input includes a compact local context when supplied", () => {
+  const context = {
+    available: true,
+    before: "before ",
+    selected: "selected phrase",
+    after: " after",
+  };
+  const input = buildInitialQuestionInput({
+    selectedText: "selected phrase",
+    question: "Why this tense?",
+    context,
+  });
   assert.match(input, /selected phrase/);
+  assert.match(input, /before /);
+  assert.match(input, / after/);
   assert.match(input, /Why this tense\?/);
-  assert.doesNotMatch(input, /surrounding source/);
   assert.equal(CONTEXT_TOOL.name, "get_context");
   assert.equal(CONTEXT_TOOL.strict, true);
+  assert.ok(INITIAL_CONTEXT_SIDE_CHARS > 0);
 });
 
-test("question flow lets the model request context before answering", async () => {
-  const sourceText = "FAR_LEFT_IGNORED xx before SELECTED after yy FAR_RIGHT_IGNORED";
+test("question flow always sends nearby context and can request a wider window", async () => {
+  const farLeft = "FAR_LEFT_IGNORED";
+  const farRight = "FAR_RIGHT_IGNORED";
+  const sourceText = `${farLeft}${"x".repeat(700)} before SELECTED after ${"y".repeat(700)}${farRight}`;
   const selectedText = "SELECTED";
   const selectedStart = sourceText.indexOf(selectedText);
   const selectedEnd = selectedStart + selectedText.length;
@@ -89,8 +104,11 @@ test("question flow lets the model request context before answering", async () =
 
   assert.equal(result.answer, "Context-aware answer");
   assert.equal(result.contextRequests, 1);
+  assert.ok(result.initialContextChars > selectedText.length);
   assert.equal(requestBodies.length, 2);
   assert.match(requestBodies[0].input, /SELECTED/);
+  assert.match(requestBodies[0].input, / before /);
+  assert.match(requestBodies[0].input, / after /);
   assert.match(requestBodies[0].input, /What does this mean here\?/);
   assert.doesNotMatch(requestBodies[0].input, /FAR_LEFT_IGNORED/);
   assert.doesNotMatch(requestBodies[0].input, /FAR_RIGHT_IGNORED/);
@@ -107,7 +125,7 @@ test("question client maps annotated selections to the nearest source occurrence
   assert.deepEqual(questionClient.resolveOffsets(source, "same", 10), { start: 9, end: 13 });
 });
 
-test("context menu uses the pre-pointer selection after Chrome collapses the live selection", () => {
+test("selection fallback still prefers a pre-pointer snapshot when one is available", () => {
   const pointerSelection = { selectedText: "target", start: 6, end: 12 };
   const staleRememberedSelection = { selectedText: "old", start: 0, end: 3 };
   assert.deepEqual(
@@ -115,20 +133,18 @@ test("context menu uses the pre-pointer selection after Chrome collapses the liv
     pointerSelection,
   );
   assert.equal(questionClient.chooseContextSelection(null, null, staleRememberedSelection, true), null);
-  assert.deepEqual(
-    questionClient.chooseContextSelection(null, null, staleRememberedSelection, false),
-    staleRememberedSelection,
-  );
 });
 
-test("question UI is explicit-only, supports a custom context menu and optional voice input", () => {
+test("question UI keeps the native browser context menu and opens through the extension bridge", () => {
   const client = fs.readFileSync(path.join(root, "question-client.js"), "utf8");
   const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const bootstrap = fs.readFileSync(path.join(root, "client-analysis.js"), "utf8");
   const entry = fs.readFileSync(path.join(root, "server-tts.js"), "utf8");
-  assert.match(client, /addEventListener\("contextmenu"[\s\S]+\{ capture: true \}\)/);
-  assert.match(client, /addEventListener\("pointerdown"[\s\S]+event\.button !== 2[\s\S]+\{ capture: true \}\)/);
-  assert.match(client, /event\.preventDefault\(\)/);
+  assert.doesNotMatch(client, /addEventListener\("contextmenu"/);
+  assert.match(client, /event\.button !== 2[\s\S]+\{ capture: true \}/);
+  assert.match(client, /annotator-connotator-extension/);
+  assert.match(client, /questionHint:\s*"テキストを選択して右クリック → 質問"/);
+  assert.doesNotMatch(client, /あの手この手さんに聞く/);
   assert.match(client, /ENDPOINT = "\/api\/question"/);
   assert.match(client, /SpeechRecognition \|\| root\.webkitSpeechRecognition/);
   assert.match(client, /submitButton\.addEventListener\("click", submitQuestion\)/);
