@@ -78,6 +78,7 @@ const els = {
   focusSelect: document.getElementById("focusSelect"),
   includeGrammar: document.getElementById("includeGrammar"),
   includeSlash: document.getElementById("includeSlash"),
+  includeTranslation: document.getElementById("includeTranslation"),
   annotateBtn: document.getElementById("annotateBtn"),
   cancelAnalyzeBtn: document.getElementById("cancelAnalyzeBtn"),
   sampleBtn: document.getElementById("sampleBtn"),
@@ -87,6 +88,7 @@ const els = {
   inlineNuancePanel: document.getElementById("inlineNuancePanel"),
   inlineNuanceCount: document.getElementById("inlineNuanceCount"),
   inlineNuanceList: document.getElementById("inlineNuanceList"),
+  translationCard: document.getElementById("translationCard"),
   translationText: document.getElementById("translationText"),
   wordList: document.getElementById("wordList"),
   slashText: document.getElementById("slashText"),
@@ -137,6 +139,7 @@ function init() {
   els.focusSelect.value = ["balanced", "grammar"].includes(savedFocus) ? "all" : (savedFocus || "all");
   els.includeGrammar.checked = localStorage.getItem("annotation.includeGrammar") !== "false";
   els.includeSlash.checked = localStorage.getItem("annotation.includeSlash") !== "false";
+  els.includeTranslation.checked = localStorage.getItem("annotation.includeTranslation") === "true";
 
   document.querySelectorAll(".segment").forEach((button) => {
     if (!button.dataset.level) return;
@@ -172,6 +175,10 @@ function init() {
   els.focusSelect.addEventListener("change", persistSettings);
   els.includeGrammar.addEventListener("change", persistSettings);
   els.includeSlash.addEventListener("change", persistSettings);
+  els.includeTranslation.addEventListener("change", () => {
+    persistSettings();
+    renderTranslation();
+  });
   els.annotateBtn.addEventListener("click", annotate);
   els.cancelAnalyzeBtn.addEventListener("click", cancelAnalysis);
   els.sampleBtn.addEventListener("click", loadSample);
@@ -349,6 +356,7 @@ function persistSettings() {
   localStorage.setItem("annotation.focus", els.focusSelect.value);
   localStorage.setItem("annotation.includeGrammar", String(els.includeGrammar.checked));
   localStorage.setItem("annotation.includeSlash", String(els.includeSlash.checked));
+  localStorage.setItem("annotation.includeTranslation", String(els.includeTranslation.checked));
 }
 
 function updateDensityLabel(shouldPersist = true) {
@@ -505,6 +513,7 @@ async function annotate() {
         focus: els.focusSelect.value,
         includeGrammar: els.includeGrammar.checked,
         includeSlash: els.includeSlash.checked,
+        includeTranslation: els.includeTranslation.checked,
         streamProgress: useProgressStream,
       }),
     });
@@ -734,8 +743,10 @@ function renderInlineNuanceList() {
 
 function renderTranslation() {
   const translation = state.result?.translation || "";
-  els.translationText.classList.toggle("empty", !translation);
-  els.translationText.textContent = translation || t("translationEmpty");
+  const shouldShow = clientAnalysis.shouldShowTranslation(els.includeTranslation.checked, translation);
+  els.translationCard.hidden = !shouldShow;
+  els.translationText.classList.toggle("empty", !shouldShow);
+  els.translationText.textContent = shouldShow ? translation : "";
 }
 
 function buildHighlightSpans(text, annotations) {
@@ -1126,6 +1137,7 @@ function setBusy(isBusy) {
   els.focusSelect.disabled = isBusy;
   els.includeGrammar.disabled = isBusy;
   els.includeSlash.disabled = isBusy;
+  els.includeTranslation.disabled = isBusy;
   document.querySelectorAll(".segment, .analysis-mode-segment").forEach((button) => {
     button.disabled = isBusy;
   });
@@ -1144,8 +1156,9 @@ function renderEmpty() {
   els.inlineNuancePanel.hidden = true;
   els.inlineNuanceList.innerHTML = "";
   els.inlineNuanceCount.textContent = "0";
+  els.translationCard.hidden = true;
   els.translationText.classList.add("empty");
-  els.translationText.textContent = t("translationEmpty");
+  els.translationText.textContent = "";
   els.wordList.innerHTML = "";
   els.wordList.appendChild(emptyCard(t("emptyWords")));
   els.slashText.classList.add("empty");

@@ -52,6 +52,14 @@ test("session cache never auto-clicks Analyze on page load", () => {
   assert.doesNotMatch(source, /root\.addEventListener\("load"[\s\S]*?analyzeButton\.click\(\)/);
 });
 
+test("reason-selection cache separates translation-enabled and translation-disabled pools", () => {
+  const source = fs.readFileSync(path.join(root, "reason-selection-client.js"), "utf8");
+  const start = source.indexOf("function analysisBaseKey(payload)");
+  const end = source.indexOf("function transformNdjsonResponse", start);
+  assert.ok(start >= 0 && end > start);
+  assert.match(source.slice(start, end), /includeTranslation: payload\.includeTranslation === true/);
+});
+
 test("reason tags are shown in cards and popup and preserved in export handlers", () => {
   const source = fs.readFileSync(path.join(root, "reason-selection-client.js"), "utf8");
   assert.match(source, /reason-badge-group/);

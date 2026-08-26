@@ -66,7 +66,17 @@
     );
   }
 
-  return { AnalysisResponseError, isCancellation, parseEvents, readProgressResponse };
+  function shouldShowTranslation(includeTranslation, translation) {
+    return includeTranslation === true && Boolean(String(translation || "").trim());
+  }
+
+  return {
+    AnalysisResponseError,
+    isCancellation,
+    parseEvents,
+    readProgressResponse,
+    shouldShowTranslation,
+  };
 }));
 
 (function prepareReasonSelectionClient(root) {
