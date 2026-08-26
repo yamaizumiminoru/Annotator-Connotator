@@ -52,6 +52,15 @@ test("Chrome extension is a minimal selection-only Manifest V3 launcher", () => 
   assert.equal(manifest.version, "0.1.0");
   assert.deepEqual(manifest.permissions, ["contextMenus"]);
   assert.equal(manifest.host_permissions, undefined);
+  assert.deepEqual(manifest.icons, {
+    16: "icons/icon16.png",
+    32: "icons/icon32.png",
+    48: "icons/icon48.png",
+    128: "icons/icon128.png",
+  });
+  for (const iconPath of Object.values(manifest.icons)) {
+    assert.equal(fs.existsSync(path.join(rootDir, "chrome-extension", iconPath)), true);
+  }
 
   const background = fs.readFileSync(path.join(rootDir, "chrome-extension", "background.js"), "utf8");
   assert.match(background, /contexts:\s*\["selection"\]/);

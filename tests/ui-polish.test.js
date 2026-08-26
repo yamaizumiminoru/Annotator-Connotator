@@ -5,6 +5,16 @@ const path = require("node:path");
 
 const root = path.join(__dirname, "..");
 
+test("the app uses the Annotator-Connotator logo in the header and favicon", () => {
+  const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const enhancements = fs.readFileSync(path.join(root, "enhancements.css"), "utf8");
+  const logoPath = path.join(root, "assets", "annotator-connotator-logo.png");
+  assert.match(index, /rel="icon"[^>]+annotator-connotator-logo\.png/);
+  assert.match(enhancements, /brand-row[\s\S]+annotator-connotator-logo\.png/);
+  assert.equal(fs.existsSync(logoPath), true);
+  assert.ok(fs.statSync(logoPath).size > 0);
+});
+
 test("Japanese UI polish covers dynamic status and speech controls", () => {
   const source = fs.readFileSync(path.join(root, "reason-ui-localization.js"), "utf8");
   assert.match(source, /uiLanguage:\s*"表示言語"/);

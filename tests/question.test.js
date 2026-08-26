@@ -107,12 +107,27 @@ test("question client maps annotated selections to the nearest source occurrence
   assert.deepEqual(questionClient.resolveOffsets(source, "same", 10), { start: 9, end: 13 });
 });
 
+test("context menu uses the pre-pointer selection after Chrome collapses the live selection", () => {
+  const pointerSelection = { selectedText: "target", start: 6, end: 12 };
+  const staleRememberedSelection = { selectedText: "old", start: 0, end: 3 };
+  assert.deepEqual(
+    questionClient.chooseContextSelection(null, pointerSelection, staleRememberedSelection, true),
+    pointerSelection,
+  );
+  assert.equal(questionClient.chooseContextSelection(null, null, staleRememberedSelection, true), null);
+  assert.deepEqual(
+    questionClient.chooseContextSelection(null, null, staleRememberedSelection, false),
+    staleRememberedSelection,
+  );
+});
+
 test("question UI is explicit-only, supports a custom context menu and optional voice input", () => {
   const client = fs.readFileSync(path.join(root, "question-client.js"), "utf8");
   const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const bootstrap = fs.readFileSync(path.join(root, "client-analysis.js"), "utf8");
   const entry = fs.readFileSync(path.join(root, "server-tts.js"), "utf8");
-  assert.match(client, /addEventListener\("contextmenu"/);
+  assert.match(client, /addEventListener\("contextmenu"[\s\S]+\{ capture: true \}\)/);
+  assert.match(client, /addEventListener\("pointerdown"[\s\S]+event\.button !== 2[\s\S]+\{ capture: true \}\)/);
   assert.match(client, /event\.preventDefault\(\)/);
   assert.match(client, /ENDPOINT = "\/api\/question"/);
   assert.match(client, /SpeechRecognition \|\| root\.webkitSpeechRecognition/);

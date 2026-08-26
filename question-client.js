@@ -242,6 +242,12 @@
     };
   }
 
+  function chooseContextSelection(liveSelection, pointerSelection, rememberedSelection, pointerObserved = false) {
+    if (liveSelection) return liveSelection;
+    if (pointerObserved) return pointerSelection || null;
+    return rememberedSelection || null;
+  }
+
   function install(root) {
     if (root.__questionClientInstalled) return;
     root.__questionClientInstalled = true;
@@ -255,6 +261,10 @@
 
     let activeSelection = null;
     let recognition = null;
+    let rememberedSourceSelection = null;
+    let rememberedAnnotatedSelection = null;
+    let pointerContextSelection = null;
+    let pointerContextObserved = false;
 
     const menu = document.createElement("div");
     menu.className = "ac-question-menu";
@@ -345,9 +355,60 @@
       return null;
     }
 
+    function selectionRegion(target) {
+      if (target === sourceInput) return "source";
+      if (annotated.contains(target)) return "annotated";
+      return null;
+    }
+
+    function rememberSelection(region, snapshot) {
+      if (!region || !snapshot) return;
+      const remembered = { snapshot, sourceText: sourceInput.value };
+      if (region === "source") rememberedSourceSelection = remembered;
+      if (region === "annotated") rememberedAnnotatedSelection = remembered;
+    }
+
+    function validRememberedSelection(region) {
+      const remembered = region === "source" ? rememberedSourceSelection : rememberedAnnotatedSelection;
+      if (!remembered || remembered.sourceText !== sourceInput.value) return null;
+      const { snapshot } = remembered;
+      if (!Number.isInteger(snapshot.start) || !Number.isInteger(snapshot.end)) return null;
+      return sourceInput.value.slice(snapshot.start, snapshot.end) === snapshot.selectedText ? snapshot : null;
+    }
+
+    sourceInput.addEventListener("select", () => {
+      rememberSelection("source", selectionFromTextarea(sourceInput));
+    });
+
+    document.addEventListener("selectionchange", () => {
+      if (document.activeElement === sourceInput) {
+        rememberSelection("source", selectionFromTextarea(sourceInput));
+        return;
+      }
+      rememberSelection("annotated", selectionFromAnnotated(root, annotated, sourceInput.value));
+    });
+
+    document.addEventListener("pointerdown", (event) => {
+      if (event.button !== 2) return;
+      pointerContextObserved = true;
+      pointerContextSelection = currentSelection(event);
+      rememberSelection(selectionRegion(event.target), pointerContextSelection);
+    }, { capture: true });
+
     document.addEventListener("contextmenu", (event) => {
+      const pointerObserved = pointerContextObserved;
+      const pointerSelection = pointerContextSelection;
+      pointerContextObserved = false;
+      pointerContextSelection = null;
       if (menu.contains(event.target) || backdrop.contains(event.target)) return;
-      const snapshot = currentSelection(event);
+      const liveSelection = currentSelection(event);
+      const rememberedSelection = validRememberedSelection(selectionRegion(event.target));
+      const snapshot = chooseContextSelection(
+        liveSelection,
+        pointerSelection,
+        rememberedSelection,
+        pointerObserved,
+      );
       if (!snapshot) {
         hideMenu();
         return;
@@ -355,7 +416,7 @@
       event.preventDefault();
       activeSelection = snapshot;
       showMenu(event.clientX, event.clientY);
-    });
+    }, { capture: true });
 
     document.addEventListener("pointerdown", (event) => {
       if (!menu.hidden && !menu.contains(event.target)) hideMenu();
@@ -479,6 +540,7 @@
     install,
     nearestOccurrence,
     resolveOffsets,
+    chooseContextSelection,
     selectionFromTextarea,
   };
 }));
