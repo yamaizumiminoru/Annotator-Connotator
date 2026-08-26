@@ -4,6 +4,7 @@ const selection = require("./lib/annotation-selection");
 const reasonSelection = require("./lib/reason-selection");
 const reasonJudge = require("./lib/reason-judge");
 const regionalDiscovery = require("./lib/regional-discovery");
+const languageRouting = require("./lib/explanation-language-routing");
 
 const requestContext = new AsyncLocalStorage();
 const nativeFetch = global.fetch.bind(global);
@@ -13,7 +14,7 @@ const originalCoveragePrompt = selection.buildCoverageCompletionPrompt;
 
 http.createServer = function createReasonAwareServer(handler) {
   return nativeCreateServer((req, res) => {
-    const context = { levels: ["intermediate"], density: 2 };
+    const context = { levels: ["intermediate"], density: 2, explanationLanguage: "" };
     let bodyText = "";
     req.on("data", (chunk) => {
       bodyText += chunk;
@@ -24,6 +25,7 @@ http.createServer = function createReasonAwareServer(handler) {
         const payload = JSON.parse(bodyText);
         context.levels = reasonSelection.normalizeSelectedLevels(payload.levels || payload.level || "intermediate");
         context.density = Number(payload.density || 2);
+        context.explanationLanguage = String(payload.explanationLanguage || "");
       } catch {
         // The real server will report malformed JSON. Context remains a harmless default.
       }
@@ -64,14 +66,37 @@ global.fetch = async function reasonAwareFetch(input, init = {}) {
     return nativeFetch(input, init);
   }
 
-  const system = systemPrompt(body);
+  let system = systemPrompt(body);
+  const initialUserPayload = parseUserPayload(body);
+  const requestedExplanationLanguage = String(
+    initialUserPayload.explanationLanguage
+      || requestContext.getStore()?.explanationLanguage
+      || "",
+  );
+  const routedSystem = languageRouting.rewriteUiTargetLanguagePrompt(
+    languageRouting.rewriteExplanationLanguagePrompt(system, requestedExplanationLanguage),
+  );
+  let routedBody = false;
+  if (routedSystem !== system) {
+    body = cloneJson(body);
+    rewriteSystemPrompt(body, routedSystem);
+    system = routedSystem;
+    routedBody = true;
+  }
+
   const isAnnotation = system.includes("You are a multilingual language-learning annotation engine.");
   const isCompletion = system.includes("You are completing candidate discovery for the later portion");
   const isConnotationTargetTest = system.includes("This is an explanation test.")
     || system.includes("Supplied connotation targets:");
 
-  if (!isAnnotation && !isCompletion) return nativeFetch(input, init);
-  if (isConnotationTargetTest) return nativeFetch(input, init);
+  if (!isAnnotation && !isCompletion) {
+    return routedBody
+      ? nativeFetch(input, { ...init, body: JSON.stringify(body) })
+      : nativeFetch(input, init);
+  }
+  if (isConnotationTargetTest) {
+    return nativeFetch(input, { ...init, body: JSON.stringify(body) });
+  }
 
   const modifiedBody = cloneJson(body);
   const originalUserPayload = parseUserPayload(modifiedBody);
