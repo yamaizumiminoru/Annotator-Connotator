@@ -79,6 +79,22 @@
   };
 }));
 
+(function restoreValidatedLanguages(root) {
+  const catalog = root?.LANGUAGE_CATALOG;
+  if (!Array.isArray(catalog)) return;
+
+  const restored = [
+    { code: "mn", name: "Mongolian", native: "Монгол", speech: "mn-MN" },
+    { code: "mi", name: "Māori", native: "Māori", speech: "mi-NZ" },
+    { code: "ur", name: "Urdu", native: "اردو", speech: "ur-PK" },
+  ];
+
+  for (const language of restored) {
+    if (!catalog.some((item) => item?.code === language.code)) catalog.push(language);
+  }
+  catalog.sort((left, right) => String(left?.name || "").localeCompare(String(right?.name || ""), "en"));
+}(typeof globalThis !== "undefined" ? globalThis : this));
+
 (function prepareReasonSelectionClient(root) {
   if (!root?.document || typeof root.localStorage === "undefined") return;
   const valid = new Set(["beginner", "intermediate", "advanced"]);

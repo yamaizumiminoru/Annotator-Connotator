@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const client = require("../tts-client.js");
 const server = require("../lib/tts-server.js");
@@ -19,22 +20,26 @@ test("device speech now uses normal 1.00 speed and AI speech uses GPT-4o mini TT
 test("documented AI speech language set is guarded before paid generation", () => {
   assert.equal(client.SUPPORTED_TTS_LANGUAGE_CODES.size, 57);
   assert.equal(server.SUPPORTED_TTS_LANGUAGE_CODES.size, 57);
-  for (const code of ["en", "ja", "zh", "ko", "fr", "de", "es", "cy"]) {
+  for (const code of ["en", "ja", "zh", "ko", "fr", "de", "es", "cy", "mi", "ur"]) {
     assert.equal(client.isSupportedTtsLanguage(code), true);
     assert.equal(server.isSupportedTtsLanguage(code), true);
   }
-  for (const code of ["am", "bn", "eu", "gu", "ha", "ka", "km", "lo", "ml", "mt", "my", "pa", "te", "uz", "yo", "zu"]) {
+  for (const code of ["am", "bn", "eu", "gu", "ha", "ka", "km", "lo", "ml", "mt", "my", "pa", "te", "uz", "yo", "zu", "mn"]) {
     assert.equal(client.isSupportedTtsLanguage(code), false);
     assert.equal(server.isSupportedTtsLanguage(code), false);
   }
 });
 
-test("55 of the app's 71 catalog languages overlap the documented AI speech set", () => {
-  const languages = fs.readFileSync(path.join(root, "languages.js"), "utf8");
-  const codes = [...languages.matchAll(/\{ code: "([a-z]{2})"/g)].map((match) => match[1]);
-  assert.equal(codes.length, 71);
+test("57 of the app's 74 catalog languages overlap the documented AI speech set", () => {
+  const sandbox = {};
+  sandbox.window = sandbox;
+  const context = vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(root, "languages.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "client-analysis.js"), "utf8"), context);
+  const codes = context.LANGUAGE_CATALOG.map((language) => language.code);
+  assert.equal(codes.length, 74);
   const overlap = codes.filter((code) => client.SUPPORTED_TTS_LANGUAGE_CODES.has(code));
-  assert.equal(overlap.length, 55);
+  assert.equal(overlap.length, 57);
 });
 
 test("AI speech chunks preserve the source exactly and stay under the conservative client limit", () => {
