@@ -14,5 +14,15 @@
   },
   "background": {
     "service_worker": "background.js"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:4174/*",
+        "http://127.0.0.1:4174/*"
+      ],
+      "js": ["question-bridge.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }
