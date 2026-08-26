@@ -52,9 +52,22 @@
     if (root.__reasonUiLocalizationInstalled) return;
     root.__reasonUiLocalizationInstalled = true;
 
-    if (root.UI_TEXT && root.UI_TEXT.ja) {
-      root.UI_TEXT.ja.appTitle = JAPANESE_APP_TITLE;
-    }
+    root.UI_TEXT = root.UI_TEXT || {};
+    root.UI_TEXT.ja = {
+      ...(root.UI_TEXT.ja || {}),
+      appTitle: JAPANESE_APP_TITLE,
+      uiLanguage: "表示言語",
+      serverReadyShort: "LLM準備完了",
+      serverKeyNeededShort: "キー未設定",
+      serverOfflineShort: "オフライン",
+    };
+    root.UI_TEXT.en = {
+      ...(root.UI_TEXT.en || {}),
+      uiLanguage: "UI language",
+      serverReadyShort: "LLM ready",
+      serverKeyNeededShort: "key needed",
+      serverOfflineShort: "offline",
+    };
 
     const select = root.document.getElementById("uiLangSelect");
     const originalT = typeof root.t === "function" ? root.t : null;
@@ -79,11 +92,6 @@
       return interpolate(fallback, values);
     };
 
-    if (currentLanguage() === "ja") {
-      const appTitle = root.document.querySelector('[data-i18n="appTitle"]');
-      if (appTitle) appTitle.textContent = JAPANESE_APP_TITLE;
-    }
-
     function relocalizeReasonBadges() {
       for (const [className, key] of Object.entries(REASON_BADGES)) {
         for (const badge of root.document.querySelectorAll(`.reason-tag.${className}`)) {
@@ -92,16 +100,86 @@
       }
     }
 
+    function relocalizeStaticPolish() {
+      const appTitle = root.document.querySelector('[data-i18n="appTitle"]');
+      if (appTitle) appTitle.textContent = root.t("appTitle");
+      const uiLanguageLabel = root.document.querySelector('[data-i18n="uiLanguage"]');
+      if (uiLanguageLabel) uiLanguageLabel.textContent = root.t("uiLanguage");
+    }
+
+    function relocalizeTtsControls() {
+      const deviceButton = root.document.getElementById("speakBtn");
+      const aiButton = root.document.getElementById("aiSpeakBtn");
+      const voiceSelect = root.document.getElementById("aiVoiceSelect");
+
+      if (deviceButton?.classList.contains("tts-device-btn")) {
+        const speaking = deviceButton.dataset.speaking === "true";
+        deviceButton.textContent = `${speaking ? "Ⅱ" : "▶"} ${root.t("deviceSpeech")}`;
+        deviceButton.title = root.t("deviceSpeechTitle");
+        deviceButton.setAttribute("aria-label", deviceButton.title);
+      }
+      if (aiButton) {
+        const speaking = aiButton.dataset.speaking === "true";
+        aiButton.textContent = `${speaking ? "■" : "✨"} ${root.t("aiSpeech")}`;
+        aiButton.title = root.t("aiSpeechTitle");
+        aiButton.setAttribute("aria-label", aiButton.title);
+      }
+      if (voiceSelect) voiceSelect.setAttribute("aria-label", root.t("aiVoice"));
+    }
+
+    function detectServerState(pill) {
+      if (!pill) return "";
+      if (pill.classList.contains("ready")) return "ready";
+      const text = String(pill.textContent || "").trim().toLowerCase();
+      if (["offline", "オフライン"].includes(text)) return "offline";
+      if (["key needed", "キー未設定"].includes(text)) return "key";
+      return pill.dataset.serverState || "";
+    }
+
+    function relocalizeServerPill() {
+      const pill = root.document.getElementById("serverPill");
+      if (!pill) return;
+      const detected = detectServerState(pill);
+      if (detected) pill.dataset.serverState = detected;
+      const state = pill.dataset.serverState;
+      const key = state === "ready"
+        ? "serverReadyShort"
+        : state === "offline"
+          ? "serverOfflineShort"
+          : state === "key"
+            ? "serverKeyNeededShort"
+            : null;
+      if (!key) return;
+      const next = root.t(key);
+      if (pill.textContent !== next) pill.textContent = next;
+    }
+
+    function relocalizeDynamicUi() {
+      relocalizeStaticPolish();
+      relocalizeTtsControls();
+      relocalizeReasonBadges();
+      relocalizeServerPill();
+    }
+
+    const serverPill = root.document.getElementById("serverPill");
+    if (serverPill && typeof root.MutationObserver === "function") {
+      const observer = new root.MutationObserver(() => relocalizeServerPill());
+      observer.observe(serverPill, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+    }
+
     async function supplementCachedLanguage(language = currentLanguage()) {
       if (!language || language === "ja" || language === "en") {
-        relocalizeReasonBadges();
+        relocalizeDynamicUi();
         return false;
       }
       const cached = readCache(root.localStorage, language);
-      if (!cached) return false;
+      if (!cached) {
+        relocalizeDynamicUi();
+        return false;
+      }
       const missing = missingUiStrings(root.UI_TEXT?.en || root.UI_TEXT?.ja || {}, cached);
       if (!Object.keys(missing).length) {
-        relocalizeReasonBadges();
+        relocalizeDynamicUi();
         return false;
       }
       if (inFlight.has(language)) return inFlight.get(language);
@@ -121,7 +199,7 @@
           // Re-run the app's existing language-change handler so its private state.uiText
           // picks up the supplemented cache rather than falling back to English.
           select?.dispatchEvent(new Event("change"));
-          root.setTimeout(relocalizeReasonBadges, 0);
+          root.setTimeout(relocalizeDynamicUi, 0);
           return true;
         } catch {
           return false;
@@ -135,16 +213,20 @@
 
     select?.addEventListener("change", () => {
       root.setTimeout(() => {
-        relocalizeReasonBadges();
+        relocalizeDynamicUi();
         supplementCachedLanguage(currentLanguage());
       }, 0);
     });
 
-    relocalizeReasonBadges();
-    root.setTimeout(() => supplementCachedLanguage(currentLanguage()), 0);
+    relocalizeDynamicUi();
+    root.setTimeout(() => {
+      relocalizeDynamicUi();
+      supplementCachedLanguage(currentLanguage());
+    }, 0);
 
     root.REASON_UI_LOCALIZATION = {
       ...(root.REASON_UI_LOCALIZATION || {}),
+      relocalizeDynamicUi,
       supplementCachedLanguage,
     };
   }
