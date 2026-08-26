@@ -97,7 +97,7 @@ test("question flow lets the model request context before answering", async () =
   assert.equal(requestBodies[1].previous_response_id, "resp_1");
   const toolOutput = JSON.parse(requestBodies[1].input[0].output);
   assert.equal(toolOutput.selected, "SELECTED");
-  assert.equal(toolOutput.before, " before");
+  assert.equal(toolOutput.before, "before ");
   assert.equal(toolOutput.after, " after");
   assert.equal(result.usage.totalTokens, 210);
 });
