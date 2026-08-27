@@ -2,7 +2,7 @@
 
 Turn any text into language-learning material with annotations, translations, and connotation-aware explanations.
 Standard analysis uses `gpt-5.6-luna`; precise analysis uses `gpt-5.6-sol`.
-The app provides 71 quality-screened languages for source text, explanations, and the interface.
+The app provides 74 quality-screened languages for source text, explanations, and the interface.
 
 ## Name
 
