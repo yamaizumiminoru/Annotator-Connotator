@@ -140,7 +140,7 @@ The feature works with public videos that expose captions. It does not bypass pr
 
 ## Language Quality Evaluation
 
-All 71 selectable languages passed two GPT-5.6 source-language cases each and a separate explanation-language test. The source cases covered an informational passage and a pragmatic passage with an idiom, stance, politeness, register, or implication. The explanation test used the same English sentence for every language. The evaluation checked translation fidelity, annotation accuracy, learning usefulness, connotation/register handling, output-language naturalness, and renderable source spans. Maori and Urdu were removed after failing the explanation-language test. See `docs/LANGUAGE_EVALUATION_2026-08-21.md` for the exact test examples, thresholds, and results, and `scripts/evaluate_candidate_languages.mjs` for the reproducible evaluator.
+All 74 selectable languages passed two GPT-5.6 source-language cases each and a separate explanation-language test. The source cases covered an informational passage and a pragmatic passage with an idiom, stance, politeness, register, or implication. The explanation test used the same English sentence for every language. The evaluation checked translation fidelity, annotation accuracy, learning usefulness, connotation/register handling, output-language naturalness, and renderable source spans. Maori and Urdu were removed after failing the explanation-language test. See `docs/LANGUAGE_EVALUATION_2026-08-21.md` for the exact test examples, thresholds, and results, and `scripts/evaluate_candidate_languages.mjs` for the reproducible evaluator.
 
 ## Credit
 
