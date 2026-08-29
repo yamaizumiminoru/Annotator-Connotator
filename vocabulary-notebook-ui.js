@@ -1,0 +1,106 @@
+(function polishVocabularyNotebookUi(root) {
+  if (!root?.document) return;
+
+  root.UI_TEXT = root.UI_TEXT || {};
+  root.UI_TEXT.ja = {
+    ...(root.UI_TEXT.ja || {}),
+    vocabularySource: "出典",
+    vocabularyExportLabel: "エクスポート",
+  };
+  root.UI_TEXT.en = {
+    ...(root.UI_TEXT.en || {}),
+    vocabularySource: "Source",
+    vocabularyExportLabel: "Export",
+  };
+
+  function uiLanguageCode() {
+    try {
+      if (typeof state === "object" && state?.uiLanguage) return state.uiLanguage;
+    } catch {
+      // Fall back to the selector.
+    }
+    return root.document.getElementById("uiLangSelect")?.value || "ja";
+  }
+
+  function labelText(key, fallbackJa, fallbackEn) {
+    try {
+      if (typeof t === "function") {
+        const translated = t(key);
+        if (translated && translated !== key) return translated;
+      }
+    } catch {
+      // Fall back to bundled Japanese/English text.
+    }
+    return String(uiLanguageCode()).toLowerCase().startsWith("ja") ? fallbackJa : fallbackEn;
+  }
+
+  function preferLightColorScheme() {
+    let meta = root.document.querySelector('meta[name="color-scheme"]');
+    if (!meta) {
+      meta = root.document.createElement("meta");
+      meta.name = "color-scheme";
+      root.document.head.appendChild(meta);
+    }
+    meta.content = "only light";
+    root.document.documentElement.style.colorScheme = "only light";
+  }
+
+  function installStyles() {
+    if (root.document.getElementById("vocabularyNotebookUiPolishStyles")) return;
+    const style = root.document.createElement("style");
+    style.id = "vocabularyNotebookUiPolishStyles";
+    style.textContent = `
+      .vocabulary-export-label{display:inline-flex;align-items:center;color:var(--muted);font-size:12px;font-weight:650;margin-right:2px}
+      .word-card > .vocab-register-control{margin-top:12px;margin-bottom:0}
+    `;
+    root.document.head.appendChild(style);
+  }
+
+  function updateExportLabel() {
+    const toolbar = root.document.querySelector(".vocabulary-export");
+    if (!toolbar) return;
+    let label = toolbar.querySelector(".vocabulary-export-label");
+    if (!label) {
+      label = root.document.createElement("span");
+      label.className = "vocabulary-export-label";
+      toolbar.prepend(label);
+    }
+    label.textContent = labelText("vocabularyExportLabel", "エクスポート", "Export");
+  }
+
+  function moveRegistrationControlsToEnd() {
+    root.document.querySelectorAll("#wordList > .word-card:not(.nuance-card)").forEach((card) => {
+      const control = card.querySelector(":scope > .vocab-register-control");
+      if (control && card.lastElementChild !== control) card.appendChild(control);
+    });
+  }
+
+  function polishDynamicUi() {
+    updateExportLabel();
+    moveRegistrationControlsToEnd();
+  }
+
+  function install() {
+    installStyles();
+    polishDynamicUi();
+
+    const wordList = root.document.getElementById("wordList");
+    if (wordList) {
+      new MutationObserver(moveRegistrationControlsToEnd).observe(wordList, { childList: true, subtree: true });
+    }
+
+    const vocabularyList = root.document.getElementById("vocabularyList");
+    if (vocabularyList) {
+      new MutationObserver(updateExportLabel).observe(vocabularyList, { childList: true, subtree: true });
+    }
+
+    root.document.getElementById("uiLangSelect")?.addEventListener("change", () => root.setTimeout(polishDynamicUi, 0));
+  }
+
+  preferLightColorScheme();
+  if (root.document.readyState === "loading") {
+    root.document.addEventListener("DOMContentLoaded", install, { once: true });
+  } else {
+    root.setTimeout(install, 0);
+  }
+}(typeof globalThis !== "undefined" ? globalThis : this));
