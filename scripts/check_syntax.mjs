@@ -14,6 +14,7 @@ const files = [
   "reason-ui-localization.js",
   "card-presentation.js",
   "vocabulary-notebook.js",
+  "vocabulary-notebook-ui.js",
   ...fs.readdirSync(path.join(root, "lib"))
     .filter((name) => name.endsWith(".js"))
     .map((name) => path.join("lib", name)),
