@@ -86,6 +86,37 @@
   font-size: 10px;
 }
 
+.screen-section {
+  width: min(1440px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 108px 0 116px;
+}
+
+.screen-heading {
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.screen-heading h2 {
+  margin: 0;
+  font-size: clamp(32px, 4vw, 50px);
+  line-height: 1.2;
+  letter-spacing: -.04em;
+}
+
+.screen-figure {
+  margin: 0;
+}
+
+.screen-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
 .setup-card-v2 {
   grid-template-columns: .82fr 1.18fr;
   align-items: start;
@@ -173,12 +204,30 @@
     font-size: 40px;
   }
 
+  .hero-demo::before {
+    right: 0;
+    left: 0;
+  }
+
   .language-callout {
     margin-top: 20px;
   }
 
   .languages-section {
     padding: 72px 0;
+  }
+
+  .screen-section {
+    width: calc(100% - 28px);
+    padding: 72px 0 78px;
+  }
+
+  .screen-heading {
+    margin-bottom: 18px;
+  }
+
+  .screen-figure img {
+    border-radius: 6px;
   }
 
   .languages-heading {
