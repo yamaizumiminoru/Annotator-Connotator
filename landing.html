@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Annotator-Connotatorは、文章やYouTube字幕から学ぶ価値のある語句・構文・ニュアンスを見つけ、文脈ごと理解し、単語帳に残せるAI語学学習ツールです。">
+  <meta name="theme-color" content="#f7f5f1">
+  <meta name="color-scheme" content="light">
+  <meta property="og:title" content="Annotator-Connotator — 文章を、そのまま語学教材に。">
+  <meta property="og:description" content="読む → 気づく → 深く理解する → 残す。AIで文章を学習素材に変える語学学習ツール。">
+  <title>Annotator-Connotator — 文章を、そのまま語学教材に。</title>
+  <link rel="icon" type="image/png" href="./assets/annotator-connotator-logo.png">
+  <link rel="stylesheet" href="./landing.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Annotator-Connotator トップへ">
+      <img src="./assets/annotator-connotator-logo.png" alt="" width="36" height="36">
+      <span>Annotator-Connotator</span>
+    </a>
+    <nav class="nav-links" aria-label="ページ内ナビゲーション">
+      <a href="#why">特徴</a>
+      <a href="#workflow">使い方</a>
+      <a href="#notebook">単語帳</a>
+      <a href="#setup">セットアップ</a>
+    </nav>
+    <a class="button button-small button-outline" href="https://github.com/yamaizumiminoru/Annotator-Connotator">GitHub</a>
+  </header>
+
+  <main id="top">
+    <section class="hero section-shell">
+      <div class="hero-copy">
+        <p class="eyebrow">AI LANGUAGE LEARNING TOOL</p>
+        <h1>読むだけで終わらせない。<br><span>文章を、そのまま語学教材に。</span></h1>
+        <p class="hero-lead">Annotator-Connotatorは、文章やYouTube字幕から、<strong>いまの自分が学ぶ価値のある語句・構文・ニュアンス</strong>を見つけ、文脈ごと理解し、あとで学べる形に残すためのツールです。</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="./index.html">アプリを開く</a>
+          <a class="button button-secondary" href="#workflow">どう使う？</a>
+        </div>
+        <ul class="hero-points" aria-label="主な特徴">
+          <li>語彙・表現・構文</li>
+          <li>Connotation / 語用論的ニュアンス</li>
+          <li>多言語対応</li>
+          <li>単語帳・Anki出力</li>
+        </ul>
+      </div>
+
+      <div class="hero-demo" aria-label="Annotator-Connotator の画面イメージ">
+        <div class="browser-frame">
+          <div class="browser-bar">
+            <span></span><span></span><span></span>
+            <p>Annotator-Connotator</p>
+          </div>
+          <div class="demo-body">
+            <div class="demo-toolbar">
+              <span class="demo-tab active">本文</span>
+              <span class="demo-tab">語句</span>
+              <span class="demo-tab">単語帳</span>
+            </div>
+            <div class="demo-paper">
+              <p>I see what you mean, but I’m <mark class="mark-phrase">not entirely convinced</mark> that this is the best approach.</p>
+            </div>
+            <div class="demo-card">
+              <div class="demo-card-head">
+                <strong>not entirely convinced</strong>
+                <span class="badge">表現</span>
+              </div>
+              <p class="demo-gloss">完全には納得していない</p>
+              <p>直接的な否定を避けながら、慎重に不同意を示す表現。</p>
+              <div class="nuance-row"><span>stance</span><span>politeness</span></div>
+              <label class="fake-check"><span>✓</span> 単語帳に登録</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="problem-band" id="why">
+      <div class="section-shell problem-grid">
+        <div>
+          <p class="eyebrow">BEYOND THE DICTIONARY</p>
+          <h2>「意味は分かった」の、もう一歩先へ。</h2>
+        </div>
+        <div class="problem-copy">
+          <p>辞書を引けば、語の意味は分かる。でも実際の文章では、<strong>なぜこの表現なのか、どのくらい硬いのか、どんな態度がにじむのか</strong>まで分からないことがある。</p>
+          <p>Annotator-Connotatorは、辞書的意味だけでなく、レジスター、stance、politeness、implicature、presuppositionなど、<strong>「この言い方がここでどう響くか」</strong>も別の層として分析します。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="features section-shell">
+      <div class="section-heading">
+        <p class="eyebrow">WHAT IT DOES</p>
+        <h2>読むためのAIではなく、<br>学ぶためのAI。</h2>
+        <p>一度の解析で全部を説明しすぎるのではなく、学習者が文章を読みながら「ここを知りたい」と思える形に整理します。</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card feature-wide">
+          <span class="feature-number">01</span>
+          <h3>レベルに合った語句を拾う</h3>
+          <p>基礎・中級・上級を選び、語彙、コロケーション、定型表現、イディオム、構文、専門語から、学ぶ価値の高いものを抽出します。</p>
+          <div class="mini-tags"><span>word</span><span>collocation</span><span>formula</span><span>construction</span></div>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">02</span>
+          <h3>ニュアンスまで分けて見る</h3>
+          <p>辞書的意味と、文脈から生まれる含みを混ぜずに表示。短く見ることも、詳しく掘ることもできます。</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">03</span>
+          <h3>解説言語とUIを別々に</h3>
+          <p>入力言語・解説言語・UI言語を独立して選択。学びたい言語と、理解に使いたい言語を分けられます。</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">04</span>
+          <h3>YouTube字幕も教材に</h3>
+          <p>公開字幕を取り込み、必要なら音声認識の誤りを補正。動画で出会った表現を、そのまま学習素材にできます。</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">05</span>
+          <h3>読み直しのコストを減らす</h3>
+          <p>解析結果はブラウザに保存。同じ設定なら再利用でき、毎回モデルを呼び直す必要はありません。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="workflow-section" id="workflow">
+      <div class="section-shell">
+        <div class="section-heading compact">
+          <p class="eyebrow">WORKFLOW</p>
+          <h2>読む → 気づく → 深く見る → 残す。</h2>
+        </div>
+        <ol class="workflow">
+          <li>
+            <span class="step-number">1</span>
+            <div><h3>文章を入れる</h3><p>読みたい文章を貼る。YouTube字幕から始めてもOK。</p></div>
+          </li>
+          <li>
+            <span class="step-number">2</span>
+            <div><h3>学ぶ箇所に気づく</h3><p>自分のレベルと目的に合った語句・構文が本文上で見える。</p></div>
+          </li>
+          <li>
+            <span class="step-number">3</span>
+            <div><h3>意味とニュアンスを見る</h3><p>カードを開き、意味、用法、例、文脈上の響きを確認する。</p></div>
+          </li>
+          <li>
+            <span class="step-number">4</span>
+            <div><h3>覚えたいものだけ残す</h3><p>単語帳に登録。出典と文脈を保ったまま、あとで検索・復習へ。</p></div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="notebook section-shell" id="notebook">
+      <div class="notebook-copy">
+        <p class="eyebrow">VOCABULARY NOTEBOOK</p>
+        <h2>「分かった」で流さず、<br>次の学習につなげる。</h2>
+        <p>気になった語句は、その場で単語帳へ。意味や例文だけでなく、<strong>どの文章で出会ったか</strong>も一緒に残ります。</p>
+        <ul class="check-list">
+          <li>同じ表現でも、出典ごとに別のカードとして保存</li>
+          <li>出典の前後文脈をあとから確認</li>
+          <li>語句・意味・例文から検索</li>
+          <li>JSON / CSV / Anki CSVへエクスポート</li>
+        </ul>
+      </div>
+      <div class="notebook-ui" aria-label="単語帳のイメージ">
+        <div class="notebook-top">
+          <div><strong>単語帳</strong><small>12件登録</small></div>
+          <div class="export-pills"><span>JSON</span><span>CSV</span><span>Anki CSV</span></div>
+        </div>
+        <div class="saved-card">
+          <div class="saved-head"><h3>come down to</h3><span class="badge blue">連語</span></div>
+          <strong>結局〜に帰着する</strong>
+          <p>複雑な問題の本質や最終的な決定要因を示すときに使う。</p>
+          <small>解説言語: 日本語 · 出典あり</small>
+        </div>
+        <div class="saved-card muted-card">
+          <div class="saved-head"><h3>tentative</h3><span class="badge gold">単語</span></div>
+          <strong>暫定的な、慎重な</strong>
+          <p>確定していないこと、あるいは断定を避けた姿勢を表す。</p>
+          <small>解説言語: 日本語 · 出典あり</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="audience-section">
+      <div class="section-shell">
+        <div class="section-heading compact">
+          <p class="eyebrow">FOR LEARNERS & TEACHERS</p>
+          <h2>教材に合わせるのではなく、<br>読みたいものを教材にする。</h2>
+        </div>
+        <div class="audience-grid">
+          <article><h3>🌱 語学学習者</h3><p>ニュース、論文、動画、SNS。自分が本当に読みたい素材で学びたい人に。</p></article>
+          <article><h3>🎓 上級学習者</h3><p>辞書には載りにくいレジスターや態度、含意まで確認したい人に。</p></article>
+          <article><h3>📚 語学教員</h3><p>実際の文章から、学習者のレベルに合わせた説明素材を素早く作りたいときに。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="setup section-shell" id="setup">
+      <div class="setup-card">
+        <div class="setup-copy">
+          <p class="eyebrow">LOCAL & BYOK</p>
+          <h2>自分のPCで、自分のAPIキーで。</h2>
+          <p>Annotator-Connotatorはローカルサーバーで動作します。OpenAI APIキーはブラウザ側に置かず、サーバー側で扱います。</p>
+          <p class="setup-note">※ 解析にはOpenAI APIの利用料金がかかります。公開運用する場合は、APIキーを安全に保管できるNode対応ホスティングが必要です。</p>
+        </div>
+        <div class="setup-steps">
+          <div><span>1</span><p>GitHubから取得</p></div>
+          <div><span>2</span><p><code>.env</code> にAPIキーを設定</p></div>
+          <div><span>3</span><p><code>launch_app.bat</code> をダブルクリック</p></div>
+        </div>
+        <div class="setup-actions">
+          <a class="button button-primary" href="https://github.com/yamaizumiminoru/Annotator-Connotator">GitHubで見る</a>
+          <a class="button button-secondary" href="https://github.com/yamaizumiminoru/Annotator-Connotator#setup">セットアップ手順</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <div class="section-shell final-cta-inner">
+        <p class="eyebrow">ANNOTATE. UNDERSTAND. KEEP.</p>
+        <h2>次に読む文章を、<br>そのまま次の教材に。</h2>
+        <p>分からないところを全部説明してもらうのではなく、<br>自分で読みながら、学ぶべきところに気づける道具へ。</p>
+        <a class="button button-primary" href="./index.html">Annotator-Connotatorを開く</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="section-shell footer-inner">
+      <div class="brand footer-brand">
+        <img src="./assets/annotator-connotator-logo.png" alt="" width="30" height="30">
+        <span>Annotator-Connotator</span>
+      </div>
+      <p>Turn any text into language-learning material.</p>
+      <a href="https://github.com/yamaizumiminoru/Annotator-Connotator">GitHub</a>
+    </div>
+  </footer>
+</body>
+</html>
