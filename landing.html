@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Annotator-Connotatorは、文章やYouTube字幕から学ぶ価値のある語句・構文・ニュアンスを見つけ、文脈ごと理解し、単語帳に残せるAI語学学習ツールです。">
+  <meta name="description" content="Annotator-Connotatorは、文章やYouTube字幕を、語彙・構文・ニュアンスまで学べる語学教材に変えるAI語学学習ツールです。入力・解説・UIで74言語に対応しています。">
   <meta name="theme-color" content="#f7f5f1">
   <meta name="color-scheme" content="light">
-  <meta property="og:title" content="Annotator-Connotator — 文章を、そのまま語学教材に。">
-  <meta property="og:description" content="読む → 気づく → 深く理解する → 残す。AIで文章を学習素材に変える語学学習ツール。">
-  <title>Annotator-Connotator — 文章を、そのまま語学教材に。</title>
+  <meta property="og:title" content="Annotator-Connotator — 文章も動画も、あの手この手で、語学教材に。">
+  <meta property="og:description" content="74言語対応。語彙・構文から、ことばのニュアンスまで。読む → 気づく → 深く理解する → 残す。">
+  <title>Annotator-Connotator — 文章も動画も、あの手この手で、語学教材に。</title>
   <link rel="icon" type="image/png" href="./assets/annotator-connotator-logo.png">
   <link rel="stylesheet" href="./landing.css">
+  <link rel="stylesheet" href="./landing-v2.css">
 </head>
 <body>
   <header class="site-header">
@@ -19,6 +20,7 @@
       <span>Annotator-Connotator</span>
     </a>
     <nav class="nav-links" aria-label="ページ内ナビゲーション">
+      <a href="#languages">74言語</a>
       <a href="#why">特徴</a>
       <a href="#workflow">使い方</a>
       <a href="#notebook">単語帳</a>
@@ -31,16 +33,20 @@
     <section class="hero section-shell">
       <div class="hero-copy">
         <p class="eyebrow">AI LANGUAGE LEARNING TOOL</p>
-        <h1>読むだけで終わらせない。<br><span>文章を、そのまま語学教材に。</span></h1>
+        <h1>文章も動画も、<br><span>あの手この手で、</span><br>語学教材に。</h1>
+        <div class="language-callout" aria-label="74言語対応">
+          <strong>74</strong>
+          <span>言語対応<br><small>入力・解説・UI</small></span>
+        </div>
         <p class="hero-lead">Annotator-Connotatorは、文章やYouTube字幕から、<strong>いまの自分が学ぶ価値のある語句・構文・ニュアンス</strong>を見つけ、文脈ごと理解し、あとで学べる形に残すためのツールです。</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="./index.html">アプリを開く</a>
+          <a class="button button-primary" href="https://github.com/yamaizumiminoru/Annotator-Connotator">最新版を見る</a>
           <a class="button button-secondary" href="#workflow">どう使う？</a>
         </div>
         <ul class="hero-points" aria-label="主な特徴">
           <li>語彙・表現・構文</li>
           <li>Connotation / 語用論的ニュアンス</li>
-          <li>多言語対応</li>
+          <li>文章・YouTube字幕</li>
           <li>単語帳・Anki出力</li>
         </ul>
       </div>
@@ -75,6 +81,34 @@
       </div>
     </section>
 
+    <section class="languages-section" id="languages">
+      <div class="section-shell">
+        <div class="languages-heading">
+          <div>
+            <p class="eyebrow">74 LANGUAGES</p>
+            <h2>ひとつの言語だけの道具じゃない。</h2>
+          </div>
+          <p>入力言語・解説言語・UI言語を別々に選択できます。学びたい言語と、理解に使いたい言語を自由に組み合わせられます。</p>
+        </div>
+        <div class="language-grid" aria-label="対応74言語">
+          <span>アフリカーンス語</span><span>アムハラ語</span><span>アラビア語</span><span>アルメニア語</span><span>アゼルバイジャン語</span><span>バスク語</span>
+          <span>ベラルーシ語</span><span>ベンガル語</span><span>ボスニア語</span><span>ブルガリア語</span><span>ビルマ語</span><span>カタルーニャ語</span>
+          <span>中国語</span><span>クロアチア語</span><span>チェコ語</span><span>デンマーク語</span><span>オランダ語</span><span>英語</span>
+          <span>エストニア語</span><span>フィンランド語</span><span>フランス語</span><span>ガリシア語</span><span>ジョージア語</span><span>ドイツ語</span>
+          <span>ギリシャ語</span><span>グジャラート語</span><span>ハウサ語</span><span>ヘブライ語</span><span>ヒンディー語</span><span>ハンガリー語</span>
+          <span>アイスランド語</span><span>インドネシア語</span><span>イタリア語</span><span>日本語</span><span>カンナダ語</span><span>カザフ語</span>
+          <span>クメール語</span><span>韓国語</span><span>ラオ語</span><span>ラトビア語</span><span>リトアニア語</span><span>マケドニア語</span>
+          <span>マレー語</span><span>マラヤーラム語</span><span>マルタ語</span><span>マラーティー語</span><span>モンゴル語</span><span>マオリ語</span>
+          <span>ネパール語</span><span>ノルウェー語</span><span>ペルシャ語</span><span>ポーランド語</span><span>ポルトガル語</span><span>パンジャーブ語</span>
+          <span>ルーマニア語</span><span>ロシア語</span><span>セルビア語</span><span>スロバキア語</span><span>スロベニア語</span><span>スペイン語</span>
+          <span>スワヒリ語</span><span>スウェーデン語</span><span>タガログ語</span><span>タミル語</span><span>テルグ語</span><span>タイ語</span>
+          <span>トルコ語</span><span>ウクライナ語</span><span>ウルドゥー語</span><span>ウズベク語</span><span>ベトナム語</span><span>ウェールズ語</span>
+          <span>ヨルバ語</span><span>ズールー語</span>
+        </div>
+        <p class="language-note">※ 音声再生の対応範囲は、言語とブラウザ・OSの音声環境によって異なります。</p>
+      </div>
+    </section>
+
     <section class="problem-band" id="why">
       <div class="section-shell problem-grid">
         <div>
@@ -92,7 +126,7 @@
       <div class="section-heading">
         <p class="eyebrow">WHAT IT DOES</p>
         <h2>読むためのAIではなく、<br>学ぶためのAI。</h2>
-        <p>一度の解析で全部を説明しすぎるのではなく、学習者が文章を読みながら「ここを知りたい」と思える形に整理します。</p>
+        <p>全部を翻訳して終わりではなく、学習者が文章を読みながら「ここを知りたい」と思える形に整理します。</p>
       </div>
       <div class="feature-grid">
         <article class="feature-card feature-wide">
@@ -109,7 +143,7 @@
         <article class="feature-card">
           <span class="feature-number">03</span>
           <h3>解説言語とUIを別々に</h3>
-          <p>入力言語・解説言語・UI言語を独立して選択。学びたい言語と、理解に使いたい言語を分けられます。</p>
+          <p>74言語から入力・解説・UIを独立して選択。多言語をまたいだ学習にも使えます。</p>
         </article>
         <article class="feature-card">
           <span class="feature-number">04</span>
@@ -131,22 +165,10 @@
           <h2>読む → 気づく → 深く見る → 残す。</h2>
         </div>
         <ol class="workflow">
-          <li>
-            <span class="step-number">1</span>
-            <div><h3>文章を入れる</h3><p>読みたい文章を貼る。YouTube字幕から始めてもOK。</p></div>
-          </li>
-          <li>
-            <span class="step-number">2</span>
-            <div><h3>学ぶ箇所に気づく</h3><p>自分のレベルと目的に合った語句・構文が本文上で見える。</p></div>
-          </li>
-          <li>
-            <span class="step-number">3</span>
-            <div><h3>意味とニュアンスを見る</h3><p>カードを開き、意味、用法、例、文脈上の響きを確認する。</p></div>
-          </li>
-          <li>
-            <span class="step-number">4</span>
-            <div><h3>覚えたいものだけ残す</h3><p>単語帳に登録。出典と文脈を保ったまま、あとで検索・復習へ。</p></div>
-          </li>
+          <li><span class="step-number">1</span><div><h3>文章・動画を入れる</h3><p>読みたい文章を貼る。YouTube字幕から始めてもOK。</p></div></li>
+          <li><span class="step-number">2</span><div><h3>学ぶ箇所に気づく</h3><p>自分のレベルと目的に合った語句・構文が本文上で見える。</p></div></li>
+          <li><span class="step-number">3</span><div><h3>意味とニュアンスを見る</h3><p>カードを開き、意味、用法、例、文脈上の響きを確認する。</p></div></li>
+          <li><span class="step-number">4</span><div><h3>覚えたいものだけ残す</h3><p>単語帳に登録。出典と文脈を保ったまま、あとで検索・復習へ。</p></div></li>
         </ol>
       </div>
     </section>
@@ -198,21 +220,31 @@
     </section>
 
     <section class="setup section-shell" id="setup">
-      <div class="setup-card">
+      <div class="setup-card setup-card-v2">
         <div class="setup-copy">
-          <p class="eyebrow">LOCAL & BYOK</p>
-          <h2>自分のPCで、自分のAPIキーで。</h2>
-          <p>Annotator-Connotatorはローカルサーバーで動作します。OpenAI APIキーはブラウザ側に置かず、サーバー側で扱います。</p>
-          <p class="setup-note">※ 解析にはOpenAI APIの利用料金がかかります。公開運用する場合は、APIキーを安全に保管できるNode対応ホスティングが必要です。</p>
+          <p class="eyebrow">SETUP WITH AI</p>
+          <h2>セットアップで絶望しそうなら、<br>生成AIにやってもらう。</h2>
+          <p>Annotator-Connotatorは自分のPCで動かすローカルアプリです。GitやNode.jsが分からなくても、下の文章をChatGPTやCodexなどに渡して、セットアップを手伝ってもらえます。</p>
+          <p class="setup-note">APIキーは秘密情報です。チャットに貼ったりGitHubへコミットしたりせず、ローカルの <code>.env</code> に自分で入力してください。</p>
         </div>
-        <div class="setup-steps">
-          <div><span>1</span><p>GitHubから取得</p></div>
-          <div><span>2</span><p><code>.env</code> にAPIキーを設定</p></div>
-          <div><span>3</span><p><code>launch_app.bat</code> をダブルクリック</p></div>
+        <div class="ai-prompt-wrap">
+          <div class="prompt-head">
+            <strong>生成AIにそのまま渡すプロンプト</strong>
+            <button class="copy-prompt" id="copySetupPrompt" type="button">コピー</button>
+          </div>
+          <pre id="setupPrompt">以下のGitHubリポジトリから Annotator-Connotator を私のPCにセットアップしてください。
+https://github.com/yamaizumiminoru/Annotator-Connotator
+
+このリポジトリをクローンし、READMEのSetupに従って、ローカルで起動できる状態まで進めてください。
+私のOSに合った方法を使い、GitやNode.jsなど必要なものがなければ確認して導入方法を案内してください。
+OpenAI APIキーは秘密情報なので、私にチャットへ貼らせたりGitへコミットしたりせず、ローカルの .env に私自身が入力できるよう案内してください。
+既存ファイルの削除・上書きなど取り返しのつかない操作をする前には確認してください。
+途中でエラーが出たら、原因を確認して解決しながら最後まで進めてください。</pre>
+          <p class="copy-status" id="copyStatus" aria-live="polite"></p>
         </div>
         <div class="setup-actions">
-          <a class="button button-primary" href="https://github.com/yamaizumiminoru/Annotator-Connotator">GitHubで見る</a>
-          <a class="button button-secondary" href="https://github.com/yamaizumiminoru/Annotator-Connotator#setup">セットアップ手順</a>
+          <a class="button button-primary" href="https://github.com/yamaizumiminoru/Annotator-Connotator">最新版を見る</a>
+          <a class="button button-secondary" href="https://github.com/yamaizumiminoru/Annotator-Connotator#setup">READMEの手順を見る</a>
         </div>
       </div>
     </section>
@@ -220,9 +252,9 @@
     <section class="final-cta">
       <div class="section-shell final-cta-inner">
         <p class="eyebrow">ANNOTATE. UNDERSTAND. KEEP.</p>
-        <h2>次に読む文章を、<br>そのまま次の教材に。</h2>
+        <h2>文章も動画も、<br>次の教材に。</h2>
         <p>分からないところを全部説明してもらうのではなく、<br>自分で読みながら、学ぶべきところに気づける道具へ。</p>
-        <a class="button button-primary" href="./index.html">Annotator-Connotatorを開く</a>
+        <a class="button button-primary" href="https://github.com/yamaizumiminoru/Annotator-Connotator">最新版を見る</a>
       </div>
     </section>
   </main>
@@ -233,9 +265,28 @@
         <img src="./assets/annotator-connotator-logo.png" alt="" width="30" height="30">
         <span>Annotator-Connotator</span>
       </div>
-      <p>Turn any text into language-learning material.</p>
+      <p>Turn text and video into language-learning material.</p>
       <a href="https://github.com/yamaizumiminoru/Annotator-Connotator">GitHub</a>
     </div>
   </footer>
+
+  <script>
+    (() => {
+      const button = document.getElementById("copySetupPrompt");
+      const prompt = document.getElementById("setupPrompt");
+      const status = document.getElementById("copyStatus");
+      if (!button || !prompt) return;
+      button.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(prompt.textContent.trim());
+          button.textContent = "コピー済み";
+          if (status) status.textContent = "プロンプトをコピーしました。";
+          setTimeout(() => { button.textContent = "コピー"; }, 1800);
+        } catch {
+          if (status) status.textContent = "コピーできませんでした。テキストを選択してコピーしてください。";
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
