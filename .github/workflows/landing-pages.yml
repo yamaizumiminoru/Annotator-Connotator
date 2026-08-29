@@ -8,6 +8,7 @@ on:
       - landing.css
       - landing-v2.css
       - assets/annotator-connotator-logo.png
+      - assets/annotator-connotator-overview.webp
       - .github/workflows/landing-pages.yml
   workflow_dispatch:
 
@@ -43,6 +44,7 @@ jobs:
           cp landing.css _site/landing.css
           cp landing-v2.css _site/landing-v2.css
           cp assets/annotator-connotator-logo.png _site/assets/annotator-connotator-logo.png
+          cp assets/annotator-connotator-overview.webp _site/assets/annotator-connotator-overview.webp
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
