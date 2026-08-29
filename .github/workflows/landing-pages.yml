@@ -1,0 +1,52 @@
+name: Deploy landing page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - landing.html
+      - landing.css
+      - landing-v2.css
+      - assets/annotator-connotator-logo.png
+      - .github/workflows/landing-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build static landing site
+        shell: bash
+        run: |
+          mkdir -p _site/assets
+          cp landing.html _site/index.html
+          cp landing.css _site/landing.css
+          cp landing-v2.css _site/landing-v2.css
+          cp assets/annotator-connotator-logo.png _site/assets/annotator-connotator-logo.png
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
