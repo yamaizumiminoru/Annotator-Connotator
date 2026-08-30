@@ -53,11 +53,27 @@
     root.document.head.appendChild(script);
   }
 
+  function resyncSelectedUiLanguage() {
+    const select = root.document.getElementById("uiLangSelect");
+    if (!select) return;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function resyncUiAfterPageLoad() {
+    if (root.document.readyState === "complete") {
+      root.setTimeout(resyncSelectedUiLanguage, 0);
+      return;
+    }
+    root.addEventListener("load", () => root.setTimeout(resyncSelectedUiLanguage, 0), { once: true });
+  }
+
   function loadMaterialIoModule() {
     if (root.document.querySelector('script[data-material-io="true"]')) return;
     const script = root.document.createElement("script");
     script.src = "./material-io.js";
+    script.async = false;
     script.dataset.materialIo = "true";
+    script.addEventListener("load", resyncUiAfterPageLoad, { once: true });
     root.document.head.appendChild(script);
   }
 
