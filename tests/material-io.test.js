@@ -97,3 +97,11 @@ test("the app loads material I/O and keeps legacy Markdown controls out of sight
   assert.match(material, /materialJsonSaveBtn/);
   assert.match(material, /tab\.dataset\.i18n = "ioTab"/);
 });
+
+test("material I/O reload resynchronizes the currently selected UI language", () => {
+  const ui = fs.readFileSync(path.join(root, "vocabulary-notebook-ui.js"), "utf8");
+  assert.match(ui, /script\.async = false/);
+  assert.match(ui, /resyncSelectedUiLanguage/);
+  assert.match(ui, /dispatchEvent\(new Event\("change"/);
+  assert.match(ui, /script\.addEventListener\("load", resyncUiAfterPageLoad/);
+});
