@@ -33,15 +33,18 @@
   }
 
   function text(key, fallbackJa, fallbackEn) {
+    const language = String(currentUiLanguage()).toLowerCase();
+    if (language.startsWith("ja")) return root.UI_TEXT.ja?.[key] || fallbackJa;
+    if (language.startsWith("en")) return root.UI_TEXT.en?.[key] || fallbackEn;
     try {
       if (typeof t === "function") {
         const translated = t(key);
         if (translated && translated !== key) return translated;
       }
     } catch {
-      // Use bundled fallback.
+      // Use English fallback for UI languages without a translated dynamic key.
     }
-    return String(currentUiLanguage()).toLowerCase().startsWith("ja") ? fallbackJa : fallbackEn;
+    return fallbackEn;
   }
 
   function installStyles() {
