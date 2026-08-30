@@ -53,6 +53,14 @@
     root.document.head.appendChild(script);
   }
 
+  function loadMaterialIoModule() {
+    if (root.document.querySelector('script[data-material-io="true"]')) return;
+    const script = root.document.createElement("script");
+    script.src = "./material-io.js";
+    script.dataset.materialIo = "true";
+    root.document.head.appendChild(script);
+  }
+
   function installStyles() {
     if (root.document.getElementById("vocabularyNotebookUiPolishStyles")) return;
     const style = root.document.createElement("style");
@@ -107,6 +115,7 @@
 
   preferLightColorScheme();
   loadUiPolishModule();
+  loadMaterialIoModule();
   if (root.document.readyState === "loading") {
     root.document.addEventListener("DOMContentLoaded", install, { once: true });
   } else {
