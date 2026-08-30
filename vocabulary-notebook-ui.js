@@ -84,6 +84,7 @@
     style.textContent = `
       .vocabulary-export-label{display:inline-flex;align-items:center;color:var(--muted);font-size:12px;font-weight:650;margin-right:2px}
       .word-card > .vocab-register-control{margin-top:12px;margin-bottom:0}
+      .stats-row,.legend,.tab[data-tab="slash"],#panel-slash,label:has(#includeSlash){display:none!important}
     `;
     root.document.head.appendChild(style);
   }
@@ -107,9 +108,33 @@
     });
   }
 
+  function polishBrandTitle() {
+    const title = root.document.querySelector('h1[data-i18n="appTitle"]');
+    if (!title) return;
+    const text = title.textContent.trim();
+    if (text !== "あの手ーターこの手ーター") return;
+
+    const units = [...title.querySelectorAll(":scope > .brand-title-unit")];
+    if (
+      units.length === 2
+      && units[0].textContent === "あの手ーター"
+      && units[1].textContent === "この手ーター"
+    ) return;
+
+    title.replaceChildren();
+    ["あの手ーター", "この手ーター"].forEach((unit, index) => {
+      if (index) title.appendChild(root.document.createElement("wbr"));
+      const span = root.document.createElement("span");
+      span.className = "brand-title-unit";
+      span.textContent = unit;
+      title.appendChild(span);
+    });
+  }
+
   function polishDynamicUi() {
     updateExportLabel();
     moveRegistrationControlsToEnd();
+    polishBrandTitle();
   }
 
   function install() {
@@ -124,6 +149,11 @@
     const vocabularyList = root.document.getElementById("vocabularyList");
     if (vocabularyList) {
       new MutationObserver(updateExportLabel).observe(vocabularyList, { childList: true, subtree: true });
+    }
+
+    const title = root.document.querySelector('h1[data-i18n="appTitle"]');
+    if (title) {
+      new MutationObserver(polishBrandTitle).observe(title, { childList: true, subtree: true, characterData: true });
     }
 
     root.document.getElementById("uiLangSelect")?.addEventListener("change", () => root.setTimeout(polishDynamicUi, 0));

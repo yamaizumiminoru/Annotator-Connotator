@@ -95,3 +95,15 @@ test("analysis cleanup restores the pasted textarea after supplying a cleaned co
   assert.match(source, /queueMicrotask\(restore\)/);
   assert.match(source, /annotation\.sourceText", original/);
 });
+
+test("legacy stats, legend, slash tab, and slash checkbox stay visually hidden", () => {
+  const source = fs.readFileSync(path.join(root, "vocabulary-notebook-ui.js"), "utf8");
+  assert.match(source, /\.stats-row,\.legend,\.tab\[data-tab="slash"\],#panel-slash,label:has\(#includeSlash\)\{display:none!important\}/);
+});
+
+test("Japanese title wrapping checks actual nowrap units instead of a stale marker", () => {
+  const source = fs.readFileSync(path.join(root, "vocabulary-notebook-ui.js"), "utf8");
+  assert.match(source, /querySelectorAll\(":scope > \.brand-title-unit"\)/);
+  assert.match(source, /units\[0\]\.textContent === "あの手ーター"/);
+  assert.match(source, /units\[1\]\.textContent === "この手ーター"/);
+});
