@@ -111,6 +111,149 @@
   justify-content: flex-start;
 }
 
+/* One compact row now serves as both annotation legend and highlight filter. */
+.annotation-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 12px;
+}
+
+.annotation-filter-chip,
+.annotation-filter-help {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fffdf7;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.annotation-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
+.annotation-filter-chip strong {
+  min-width: 1.5em;
+  text-align: center;
+  font-size: 11px;
+}
+
+.annotation-filter-chip.active.filter-vocab {
+  border-color: #e3bb78;
+  background: var(--vocab-bg);
+  color: var(--vocab-fg);
+}
+
+.annotation-filter-chip.active.filter-phrase {
+  border-color: #9ac8d7;
+  background: var(--phrase-bg);
+  color: var(--phrase-fg);
+}
+
+.annotation-filter-chip.active.filter-grammar {
+  border-color: #c8a8d0;
+  background: var(--grammar-bg);
+  color: var(--grammar-fg);
+}
+
+.annotation-filter-chip.active.filter-nuance {
+  border-color: #e1b4a8;
+  background: var(--nuance-bg);
+  color: var(--nuance-fg);
+}
+
+.annotation-filter-chip:not(.active) {
+  opacity: .58;
+  border-style: dashed;
+  background: #fbfaf5;
+  color: var(--muted);
+}
+
+.annotation-filter-help {
+  width: 30px;
+  padding: 0;
+  font-size: 12px;
+}
+
+/* Idioms belong to the expression filter, so their in-text color matches it. */
+.hl-idiom {
+  background: var(--phrase-bg);
+  color: var(--phrase-fg);
+}
+
+.result-pane.filter-hide-vocab .hl-word,
+.result-pane.filter-hide-vocab .hl-term,
+.result-pane.filter-hide-phrase .hl-collocation,
+.result-pane.filter-hide-phrase .hl-formula,
+.result-pane.filter-hide-phrase .hl-idiom,
+.result-pane.filter-hide-grammar .hl-construction {
+  padding-left: 0;
+  padding-right: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.result-pane.filter-hide-nuance .nuance-inline {
+  box-shadow: none;
+}
+
+.result-pane.filter-hide-nuance .nuance-only {
+  padding-left: 0;
+  padding-right: 0;
+  background: transparent;
+}
+
+/* Removed features remain in the legacy DOM only so older client code stays safe. */
+.tab[data-tab="slash"][hidden],
+#panel-slash[hidden],
+.inline-nuance-panel[hidden] {
+  display: none !important;
+}
+
+/* Keep each half of the playful Japanese title intact; wrap only between halves. */
+.brand-title-unit {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Cursor affordances: static chrome is default, selectable prose is text, actions are pointers. */
+.input-pane,
+.result-pane,
+.stat,
+.analysis-meta,
+.server-pill,
+.field-label,
+.badge,
+.reason-tag,
+.word-card-head,
+.inline-nuance-heading {
+  cursor: default;
+}
+
+#sourceText,
+#exportText,
+.script-text,
+.translation-card p,
+.word-card p,
+.popup p,
+.category-glossary p {
+  cursor: text;
+}
+
+button,
+a,
+select,
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
+  cursor: pointer;
+}
+
 @media (max-width: 520px) {
   .brand-row > div:first-child {
     min-height: 44px;
@@ -130,5 +273,14 @@
   .level-checkbox {
     flex: 1 1 auto;
     justify-content: center;
+  }
+
+  .annotation-filter-bar {
+    gap: 5px;
+  }
+
+  .annotation-filter-chip {
+    flex: 1 1 auto;
+    justify-content: space-between;
   }
 }
