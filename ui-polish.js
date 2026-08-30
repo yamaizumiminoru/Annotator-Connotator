@@ -201,19 +201,23 @@
     updateFilterButtons();
   }
 
+  function ensureHidden(node) {
+    if (node && !node.hasAttribute("hidden")) node.setAttribute("hidden", "");
+  }
+
   function removeSlashUi() {
     const checkbox = root.document.getElementById("includeSlash");
     if (checkbox) {
       checkbox.checked = false;
-      checkbox.closest("label")?.setAttribute("hidden", "");
+      ensureHidden(checkbox.closest("label"));
       try { root.localStorage.setItem("annotation.includeSlash", "false"); } catch {}
     }
-    root.document.querySelector('.tab[data-tab="slash"]')?.setAttribute("hidden", "");
-    root.document.getElementById("panel-slash")?.setAttribute("hidden", "");
+    ensureHidden(root.document.querySelector('.tab[data-tab="slash"]'));
+    ensureHidden(root.document.getElementById("panel-slash"));
   }
 
   function hideInlineNuanceSummary() {
-    root.document.getElementById("inlineNuancePanel")?.setAttribute("hidden", "");
+    ensureHidden(root.document.getElementById("inlineNuancePanel"));
   }
 
   function polishBrandTitle() {
