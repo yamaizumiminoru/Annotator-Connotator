@@ -131,6 +131,9 @@
         return {
           level: state.level,
           analysisMode: state.analysisMode,
+          extractionMode: root.INTENSIVE_MODE?.getMode?.()
+            || root.localStorage.getItem("annotation.extractionMode")
+            || "standard",
           density: els.densityRange.value,
           nuanceDetail: els.nuanceRange.value,
           focus: els.focusSelect.value,
@@ -138,6 +141,8 @@
           explanationLanguageSelection: els.explanationLangSelect.value,
           includeGrammar: els.includeGrammar.checked,
           includeTranslation: els.includeTranslation.checked,
+          showExplanations: root.INTENSIVE_MODE?.getExplanationsVisible?.()
+            ?? (root.localStorage.getItem("annotation.showExplanations") !== "false"),
         };
       } catch {
         return {};
@@ -158,6 +163,23 @@
       return candidate;
     }
 
+    function applyImportedDisplaySettings(settings) {
+      const extractionMode = settings.extractionMode === "intensive" ? "intensive" : "standard";
+      if (root.INTENSIVE_MODE?.setMode) {
+        root.INTENSIVE_MODE.setMode(extractionMode, { adjustDensity: false });
+      } else {
+        root.localStorage.setItem("annotation.extractionMode", extractionMode);
+      }
+
+      if (typeof settings.showExplanations === "boolean") {
+        if (root.INTENSIVE_MODE?.setExplanationsVisible) {
+          root.INTENSIVE_MODE.setExplanationsVisible(settings.showExplanations);
+        } else {
+          root.localStorage.setItem("annotation.showExplanations", String(settings.showExplanations));
+        }
+      }
+    }
+
     function applyImportedMaterial(material) {
       if (!validateResult(material.result)) throw new Error("invalid_material");
       const imported = normalizedImportedResult(material.result);
@@ -167,6 +189,7 @@
         setLevel(settings.level || imported.level);
       }
       if (["standard", "precise"].includes(settings.analysisMode)) setAnalysisMode(settings.analysisMode);
+      applyImportedDisplaySettings(settings);
       if (["1", "2", "3"].includes(String(settings.density))) els.densityRange.value = String(settings.density);
       if (["1", "2", "3"].includes(String(settings.nuanceDetail))) els.nuanceRange.value = String(settings.nuanceDetail);
       if (["all", "speaking", "academic"].includes(settings.focus)) els.focusSelect.value = settings.focus;

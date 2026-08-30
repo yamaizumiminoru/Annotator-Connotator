@@ -49,8 +49,34 @@
     if (root.document.querySelector('script[data-ui-polish="true"]')) return;
     const script = root.document.createElement("script");
     script.src = "./ui-polish.js";
+    script.async = false;
     script.dataset.uiPolish = "true";
     root.document.head.appendChild(script);
+  }
+
+  function loadIntensiveModeModule() {
+    if (root.document.querySelector('script[data-intensive-mode="true"]')) return;
+
+    const loadClient = () => {
+      if (root.document.querySelector('script[data-intensive-mode="true"]')) return;
+      const client = root.document.createElement("script");
+      client.src = "./intensive-mode.js";
+      client.async = false;
+      client.dataset.intensiveMode = "true";
+      root.document.head.appendChild(client);
+    };
+
+    if (root.INTENSIVE_MODE_CORE) {
+      loadClient();
+      return;
+    }
+
+    const core = root.document.createElement("script");
+    core.src = "./lib/intensive-mode.js";
+    core.async = false;
+    core.dataset.intensiveModeCore = "true";
+    core.addEventListener("load", loadClient, { once: true });
+    root.document.head.appendChild(core);
   }
 
   function resyncSelectedUiLanguage() {
@@ -162,6 +188,7 @@
 
   preferLightColorScheme();
   loadUiPolishModule();
+  loadIntensiveModeModule();
   loadMaterialIoModule();
   if (root.document.readyState === "loading") {
     root.document.addEventListener("DOMContentLoaded", install, { once: true });

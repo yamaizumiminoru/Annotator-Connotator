@@ -5,6 +5,7 @@ const reasonSelection = require("./lib/reason-selection");
 const reasonJudge = require("./lib/reason-judge");
 const regionalDiscovery = require("./lib/regional-discovery");
 const languageRouting = require("./lib/explanation-language-routing");
+const intensiveMode = require("./lib/intensive-mode");
 
 const requestContext = new AsyncLocalStorage();
 const nativeFetch = global.fetch.bind(global);
@@ -14,7 +15,12 @@ const originalCoveragePrompt = selection.buildCoverageCompletionPrompt;
 
 http.createServer = function createReasonAwareServer(handler) {
   return nativeCreateServer((req, res) => {
-    const context = { levels: ["intermediate"], density: 2, explanationLanguage: "" };
+    const context = {
+      levels: ["intermediate"],
+      density: 2,
+      explanationLanguage: "",
+      extractionMode: intensiveMode.STANDARD_MODE,
+    };
     let bodyText = "";
     req.on("data", (chunk) => {
       bodyText += chunk;
@@ -26,6 +32,7 @@ http.createServer = function createReasonAwareServer(handler) {
         context.levels = reasonSelection.normalizeSelectedLevels(payload.levels || payload.level || "intermediate");
         context.density = Number(payload.density || 2);
         context.explanationLanguage = String(payload.explanationLanguage || "");
+        context.extractionMode = intensiveMode.normalizeMode(payload.extractionMode);
       } catch {
         // The real server will report malformed JSON. Context remains a harmless default.
       }
@@ -35,19 +42,27 @@ http.createServer = function createReasonAwareServer(handler) {
 };
 
 selection.selectAnnotationsByDensity = function selectReasonTaggedAnnotations(candidates, density) {
-  const levels = requestContext.getStore()?.levels || ["intermediate"];
-  return reasonSelection.selectAnnotationsByDensity(candidates, density, levels);
+  const context = requestContext.getStore();
+  const levels = context?.levels || ["intermediate"];
+  const effectiveDensity = intensiveMode.isIntensive(context?.extractionMode) ? 3 : density;
+  return reasonSelection.selectAnnotationsByDensity(candidates, effectiveDensity, levels);
 };
 selection.stripInternalSelectionFields = reasonSelection.stripInternalSelectionFields;
 selection.wholePassageSelectionRules = function broadWholePassageSelectionRules(target) {
   const base = originalWholePassageSelectionRules(target).filter((line) => !/learner-level threshold/i.test(line));
-  return [
+  const rules = [
     ...base,
     "Ordinary candidate discovery is deliberately broad across beginner, intermediate, and advanced learning targets. Learner-band eligibility is decided in a separate contextual judge after discovery.",
     "Do not discard an expression merely because its component words look easy: idioms, phrasal verbs, metaphorical or extended senses, reusable constructions, and technical terms may still be valuable.",
     "Actively look for phrasal verbs, idioms, fixed expressions, and nonliteral or extended uses. Do not omit them merely because their component words are basic or familiar.",
     "These broad-discovery rules apply only to ordinary annotations. Keep connotation discovery sparse, grounded, and precision-first.",
   ];
+  if (intensiveMode.isIntensive(requestContext.getStore()?.extractionMode)) {
+    rules.push(
+      "This request uses intensive close-reading mode. Discover substantially more medium-value teachable candidates than normal mode while preserving the no-overlap rule.",
+    );
+  }
+  return rules;
 };
 selection.buildCoverageCompletionPrompt = function broadCoverageCompletionPrompt(args) {
   return reasonJudge.broadenCoveragePrompt(originalCoveragePrompt(args));
@@ -104,17 +119,27 @@ global.fetch = async function reasonAwareFetch(input, init = {}) {
   const scanRegions = isAnnotation
     ? regionalDiscovery.buildScanRegions(sourceText)
     : [];
+  const context = requestContext.getStore();
+  const intensive = isAnnotation
+    && intensiveMode.isIntensive(context?.extractionMode)
+    && !intensiveMode.isTooLong(sourceText);
+  const hardMaximum = intensive
+    ? intensiveMode.intensiveCandidateMaximum(sourceText)
+    : selection.candidateDiscoveryTarget(sourceText);
   const broadPrompt = isAnnotation
     ? reasonJudge.broadenAnnotationPrompt(system)
     : reasonJudge.broadenCoveragePrompt(system);
+  const regionalPrompt = isAnnotation
+    ? regionalDiscovery.regionalizeAnnotationPrompt(broadPrompt, {
+        regions: scanRegions,
+        hardMaximum,
+      })
+    : broadPrompt;
   rewriteSystemPrompt(
     modifiedBody,
-    isAnnotation
-      ? regionalDiscovery.regionalizeAnnotationPrompt(broadPrompt, {
-          regions: scanRegions,
-          hardMaximum: selection.candidateDiscoveryTarget(sourceText),
-        })
-      : broadPrompt,
+    intensive
+      ? intensiveMode.augmentAnnotationPrompt(regionalPrompt, { hardMaximum })
+      : regionalPrompt,
   );
   if (isAnnotation) rewriteUserPayload(modifiedBody, {
     ...originalUserPayload,
@@ -149,7 +174,11 @@ global.fetch = async function reasonAwareFetch(input, init = {}) {
       parsed.regions,
     );
     parsed.annotations = flattened.annotations;
-    parsed._regionalDiscovery = flattened.telemetry;
+    parsed._regionalDiscovery = {
+      ...flattened.telemetry,
+      extractionMode: intensive ? intensiveMode.INTENSIVE_MODE : intensiveMode.STANDARD_MODE,
+      hardMaximum,
+    };
     delete parsed.regions;
   }
   if (!Array.isArray(parsed.annotations) || !parsed.annotations.length) {
