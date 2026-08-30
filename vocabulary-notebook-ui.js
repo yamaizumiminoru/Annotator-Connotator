@@ -45,6 +45,14 @@
     root.document.documentElement.style.colorScheme = "only light";
   }
 
+  function loadUiPolishModule() {
+    if (root.document.querySelector('script[data-ui-polish="true"]')) return;
+    const script = root.document.createElement("script");
+    script.src = "./ui-polish.js";
+    script.dataset.uiPolish = "true";
+    root.document.head.appendChild(script);
+  }
+
   function installStyles() {
     if (root.document.getElementById("vocabularyNotebookUiPolishStyles")) return;
     const style = root.document.createElement("style");
@@ -98,6 +106,7 @@
   }
 
   preferLightColorScheme();
+  loadUiPolishModule();
   if (root.document.readyState === "loading") {
     root.document.addEventListener("DOMContentLoaded", install, { once: true });
   } else {
