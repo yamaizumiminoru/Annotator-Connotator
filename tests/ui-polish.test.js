@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { normalizePastedProse } = require("../ui-polish.js");
 
 const root = path.join(__dirname, "..");
 
@@ -37,4 +38,39 @@ test("question feature is loaded directly after the base app", () => {
   assert.ok(baseApp >= 0, "base app should be loaded");
   assert.ok(question > baseApp, "question-client.js should load directly after the base app");
   assert.doesNotMatch(bootstrap, /loadScript\("\.\/question-client\.js"\)/);
+});
+
+test("joins wrapped English prose within a paragraph", () => {
+  assert.equal(
+    normalizePastedProse("What we communicate is much richer\nthan what we literally say. The listener\nuses contextual information."),
+    "What we communicate is much richer than what we literally say. The listener uses contextual information.",
+  );
+});
+
+test("joins wrapped Japanese prose without inserting spaces", () => {
+  assert.equal(
+    normalizePastedProse("研究とは、人類の知を\n広げる活動です。"),
+    "研究とは、人類の知を広げる活動です。",
+  );
+});
+
+test("preserves paragraph boundaries", () => {
+  assert.equal(
+    normalizePastedProse("First line\ncontinues here.\n\nSecond paragraph\ncontinues too."),
+    "First line continues here.\n\nSecond paragraph continues too.",
+  );
+});
+
+test("repairs common line-end hyphenation", () => {
+  assert.equal(
+    normalizePastedProse("This is an inter-\nnational example."),
+    "This is an international example.",
+  );
+});
+
+test("preserves simple list structure", () => {
+  assert.equal(
+    normalizePastedProse("Intro line\n- first item\n- second item"),
+    "Intro line\n- first item\n- second item",
+  );
 });
