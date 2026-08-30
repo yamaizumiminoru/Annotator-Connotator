@@ -9,6 +9,12 @@
     return /[A-Za-z]-$/u.test(left) && /^[a-z]/u.test(right);
   }
 
+  function isLikelyParagraphBreak(left) {
+    const value = String(left || "").trim();
+    if (!value) return false;
+    return /[.!?。！？…]["'”’」』）)\]】〕〉》]*$/u.test(value);
+  }
+
   function needsJoinSpace(left, right) {
     const cjkEnd = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}、。，．！？）」』】〕〉》]$/u;
     const cjkStart = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}「『（【〔〈《]/u;
@@ -34,6 +40,10 @@
         output = `${output.slice(0, -1)}${current}`;
         continue;
       }
+      if (isLikelyParagraphBreak(previous)) {
+        output += `\n${current}`;
+        continue;
+      }
       output += `${needsJoinSpace(output, current) ? " " : ""}${current}`;
     }
     return output;
@@ -53,7 +63,12 @@
       .join("\n\n");
   }
 
-  const api = { normalizePastedProse, joinProseBlock, isStructuralLine };
+  const api = {
+    normalizePastedProse,
+    joinProseBlock,
+    isStructuralLine,
+    isLikelyParagraphBreak,
+  };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (!root?.document) return;
   root.UI_POLISH = api;
@@ -239,10 +254,19 @@
   function cleanBeforeAnalysis() {
     const source = root.document.getElementById("sourceText");
     if (!source || !source.value.trim()) return;
-    const cleaned = normalizePastedProse(source.value);
-    if (!cleaned || cleaned === source.value) return;
+    const original = source.value;
+    const cleaned = normalizePastedProse(original);
+    if (!cleaned || cleaned === original) return;
+
+    // The existing analyze handler reads sourceText synchronously on this click.
+    // Supply the cleaned copy for that read, then immediately restore what the user pasted.
     source.value = cleaned;
-    try { root.localStorage.setItem("annotation.sourceText", cleaned); } catch {}
+    const restore = () => {
+      if (source.value === cleaned) source.value = original;
+      try { root.localStorage.setItem("annotation.sourceText", original); } catch {}
+    };
+    if (typeof root.queueMicrotask === "function") root.queueMicrotask(restore);
+    else root.setTimeout(restore, 0);
   }
 
   function installTextCleanup() {

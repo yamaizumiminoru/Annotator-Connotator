@@ -40,10 +40,10 @@ test("question feature is loaded directly after the base app", () => {
   assert.doesNotMatch(bootstrap, /loadScript\("\.\/question-client\.js"\)/);
 });
 
-test("joins wrapped English prose within a paragraph", () => {
+test("joins wrapped English prose within a sentence", () => {
   assert.equal(
-    normalizePastedProse("What we communicate is much richer\nthan what we literally say. The listener\nuses contextual information."),
-    "What we communicate is much richer than what we literally say. The listener uses contextual information.",
+    normalizePastedProse("What we communicate is much richer\nthan what we literally say and the listener\nuses contextual information."),
+    "What we communicate is much richer than what we literally say and the listener uses contextual information.",
   );
 });
 
@@ -54,10 +54,24 @@ test("joins wrapped Japanese prose without inserting spaces", () => {
   );
 });
 
-test("preserves paragraph boundaries", () => {
+test("preserves explicit blank-line paragraph boundaries", () => {
   assert.equal(
     normalizePastedProse("First line\ncontinues here.\n\nSecond paragraph\ncontinues too."),
     "First line continues here.\n\nSecond paragraph continues too.",
+  );
+});
+
+test("preserves an English single line break after sentence-final punctuation", () => {
+  assert.equal(
+    normalizePastedProse("First paragraph ends here.\nSecond paragraph starts here."),
+    "First paragraph ends here.\nSecond paragraph starts here.",
+  );
+});
+
+test("preserves a Japanese single line break after sentence-final punctuation", () => {
+  assert.equal(
+    normalizePastedProse("第一段落です。\n第二段落です。"),
+    "第一段落です。\n第二段落です。",
   );
 });
 
@@ -73,4 +87,11 @@ test("preserves simple list structure", () => {
     normalizePastedProse("Intro line\n- first item\n- second item"),
     "Intro line\n- first item\n- second item",
   );
+});
+
+test("analysis cleanup restores the pasted textarea after supplying a cleaned copy", () => {
+  const source = fs.readFileSync(path.join(root, "ui-polish.js"), "utf8");
+  assert.match(source, /const original = source\.value/);
+  assert.match(source, /queueMicrotask\(restore\)/);
+  assert.match(source, /annotation\.sourceText", original/);
 });
