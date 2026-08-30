@@ -220,6 +220,14 @@
     if (node && !node.hasAttribute("hidden")) node.setAttribute("hidden", "");
   }
 
+  function retireGrammarToggle() {
+    const checkbox = root.document.getElementById("includeGrammar");
+    if (!checkbox) return;
+    checkbox.checked = true;
+    ensureHidden(checkbox.closest("label"));
+    try { root.localStorage.setItem("annotation.includeGrammar", "true"); } catch {}
+  }
+
   function removeSlashUi() {
     const checkbox = root.document.getElementById("includeSlash");
     if (checkbox) {
@@ -252,6 +260,7 @@
   }
 
   function cleanBeforeAnalysis() {
+    retireGrammarToggle();
     const source = root.document.getElementById("sourceText");
     if (!source || !source.value.trim()) return;
     const original = source.value;
@@ -277,6 +286,7 @@
 
   function install() {
     installFilterBar();
+    retireGrammarToggle();
     removeSlashUi();
     hideInlineNuanceSummary();
     polishBrandTitle();
@@ -288,6 +298,7 @@
       root.setTimeout(() => {
         polishBrandTitle();
         updateFilterButtons();
+        retireGrammarToggle();
         removeSlashUi();
         hideInlineNuanceSummary();
       }, 0);

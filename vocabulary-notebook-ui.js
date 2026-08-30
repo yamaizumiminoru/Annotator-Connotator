@@ -84,7 +84,8 @@
     style.textContent = `
       .vocabulary-export-label{display:inline-flex;align-items:center;color:var(--muted);font-size:12px;font-weight:650;margin-right:2px}
       .word-card > .vocab-register-control{margin-top:12px;margin-bottom:0}
-      .stats-row,.legend,.tab[data-tab="slash"],#panel-slash,label:has(#includeSlash){display:none!important}
+      .stats-row,.legend,.tab[data-tab="slash"],#panel-slash,label:has(#includeSlash),label:has(#includeGrammar){display:none!important}
+      #sourceText{flex:0 0 auto!important;height:260px;min-height:260px;resize:vertical}
     `;
     root.document.head.appendChild(style);
   }

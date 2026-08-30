@@ -96,9 +96,22 @@ test("analysis cleanup restores the pasted textarea after supplying a cleaned co
   assert.match(source, /annotation\.sourceText", original/);
 });
 
-test("legacy stats, legend, slash tab, and slash checkbox stay visually hidden", () => {
+test("legacy rows, slash UI, and retired grammar toggle stay visually hidden", () => {
   const source = fs.readFileSync(path.join(root, "vocabulary-notebook-ui.js"), "utf8");
-  assert.match(source, /\.stats-row,\.legend,\.tab\[data-tab="slash"\],#panel-slash,label:has\(#includeSlash\)\{display:none!important\}/);
+  assert.match(source, /\.stats-row,\.legend,\.tab\[data-tab="slash"\],#panel-slash,label:has\(#includeSlash\),label:has\(#includeGrammar\)\{display:none!important\}/);
+});
+
+test("source textarea starts at a practical height and remains vertically resizable", () => {
+  const source = fs.readFileSync(path.join(root, "vocabulary-notebook-ui.js"), "utf8");
+  assert.match(source, /#sourceText\{flex:0 0 auto!important;height:260px;min-height:260px;resize:vertical\}/);
+});
+
+test("retired grammar toggle is forced on before analysis", () => {
+  const source = fs.readFileSync(path.join(root, "ui-polish.js"), "utf8");
+  assert.match(source, /function retireGrammarToggle\(\)/);
+  assert.match(source, /checkbox\.checked = true/);
+  assert.match(source, /annotation\.includeGrammar", "true"/);
+  assert.match(source, /function cleanBeforeAnalysis\(\) \{\s*retireGrammarToggle\(\)/);
 });
 
 test("Japanese title wrapping checks actual nowrap units instead of a stale marker", () => {
