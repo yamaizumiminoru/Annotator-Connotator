@@ -16,6 +16,16 @@ test("display settings polish separates analysis and result display controls", (
   assert.match(source, /help\.insertAdjacentElement\("afterend", label\)/);
 });
 
+test("text-click explanation popups remain fully visible when the word-list explanation toggle is off", () => {
+  const source = fs.readFileSync(path.join(root, "display-settings-polish.js"), "utf8");
+  assert.match(source, /hide-annotation-explanations \.popup \.popup-def/);
+  assert.match(source, /hide-annotation-explanations \.popup \.popup-pattern/);
+  assert.match(source, /hide-annotation-explanations \.popup \.popup-note/);
+  assert.match(source, /hide-annotation-explanations \.popup \.popup-ex/);
+  assert.match(source, /hide-annotation-explanations \.popup \.popup-nuances/);
+  assert.match(source, /hide-annotation-explanations \.annotation-stack-body\{display:block!important\}/);
+});
+
 test("category glossary suppresses the irrelevant vocabulary registration control", () => {
   const source = fs.readFileSync(path.join(root, "display-settings-polish.js"), "utf8");
   assert.match(source, /querySelector\("\.category-glossary"\)/);
