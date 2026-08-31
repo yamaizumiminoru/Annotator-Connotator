@@ -1,6 +1,7 @@
 const http = require("http");
 const { AsyncLocalStorage } = require("async_hooks");
 const selection = require("./lib/annotation-selection");
+const annotationNormalization = require("./lib/annotation-normalization");
 const reasonSelection = require("./lib/reason-selection");
 const reasonJudge = require("./lib/reason-judge");
 const regionalDiscovery = require("./lib/regional-discovery");
@@ -12,6 +13,13 @@ const nativeFetch = global.fetch.bind(global);
 const nativeCreateServer = http.createServer.bind(http);
 const originalWholePassageSelectionRules = selection.wholePassageSelectionRules;
 const originalCoveragePrompt = selection.buildCoverageCompletionPrompt;
+const originalMergeAnnotations = selection.mergeUniqueNonOverlappingAnnotations;
+const originalRepairOffsets = annotationNormalization.repairAnnotationOffsets;
+const originalRegionalFlatten = regionalDiscovery.flattenRegionalAnnotations;
+
+function isComprehensiveRequest() {
+  return intensiveMode.isIntensive(requestContext.getStore()?.extractionMode);
+}
 
 http.createServer = function createReasonAwareServer(handler) {
   return nativeCreateServer((req, res) => {
@@ -41,10 +49,31 @@ http.createServer = function createReasonAwareServer(handler) {
   });
 };
 
+// server.js destructures these functions only after this patch module is loaded.
+// Keep normal-mode behavior untouched and switch to overlap-tolerant helpers only
+// for the hidden internal mode behind extraction density 4 (「網羅」).
+selection.mergeUniqueNonOverlappingAnnotations = function mergeAnnotationsByMode(existing, additions) {
+  return isComprehensiveRequest()
+    ? intensiveMode.mergeUniqueOverlappingAnnotations(existing, additions)
+    : originalMergeAnnotations(existing, additions);
+};
+
+annotationNormalization.repairAnnotationOffsets = function repairOffsetsByMode(sourceText, annotations) {
+  return isComprehensiveRequest()
+    ? intensiveMode.repairAnnotationOffsetsAllowOverlap(sourceText, annotations)
+    : originalRepairOffsets(sourceText, annotations);
+};
+
+regionalDiscovery.flattenRegionalAnnotations = function flattenRegionsByMode(sourceText, scanRegions, modelRegions) {
+  return isComprehensiveRequest()
+    ? intensiveMode.flattenRegionalAnnotationsAllowOverlap(sourceText, scanRegions, modelRegions)
+    : originalRegionalFlatten(sourceText, scanRegions, modelRegions);
+};
+
 selection.selectAnnotationsByDensity = function selectReasonTaggedAnnotations(candidates, density) {
   const context = requestContext.getStore();
   const levels = context?.levels || ["intermediate"];
-  const effectiveDensity = intensiveMode.isIntensive(context?.extractionMode) ? 3 : density;
+  const effectiveDensity = isComprehensiveRequest() ? 3 : density;
   return reasonSelection.selectAnnotationsByDensity(candidates, effectiveDensity, levels);
 };
 selection.stripInternalSelectionFields = reasonSelection.stripInternalSelectionFields;
@@ -57,15 +86,24 @@ selection.wholePassageSelectionRules = function broadWholePassageSelectionRules(
     "Actively look for phrasal verbs, idioms, fixed expressions, and nonliteral or extended uses. Do not omit them merely because their component words are basic or familiar.",
     "These broad-discovery rules apply only to ordinary annotations. Keep connotation discovery sparse, grounded, and precision-first.",
   ];
-  if (intensiveMode.isIntensive(requestContext.getStore()?.extractionMode)) {
+  if (isComprehensiveRequest()) {
     rules.push(
-      "This request uses intensive close-reading mode. Discover substantially more medium-value teachable candidates than normal mode while preserving the no-overlap rule.",
+      "This request uses comprehensive teacher-preparation mode. Discover substantially more medium-value teachable candidates than normal mode. Overlapping ordinary candidates are allowed when the spans support genuinely different explanations.",
     );
   }
   return rules;
 };
 selection.buildCoverageCompletionPrompt = function broadCoverageCompletionPrompt(args) {
-  return reasonJudge.broadenCoveragePrompt(originalCoveragePrompt(args));
+  let prompt = reasonJudge.broadenCoveragePrompt(originalCoveragePrompt(args));
+  prompt = intensiveMode.rewriteOptionalNotePrompt(prompt);
+  if (isComprehensiveRequest()) {
+    prompt = prompt.replace(
+      /Do not fill a quota, repeat an existing target, or create overlapping targets\./g,
+      "Do not fill a quota or repeat an existing target. Overlapping targets are allowed when they represent genuinely different teachable units.",
+    );
+    prompt += "\n- Comprehensive mode may return a smaller expression and a larger phrase or construction when each supports a distinct explanation.";
+  }
+  return prompt;
 };
 
 global.fetch = async function reasonAwareFetch(input, init = {}) {
@@ -120,10 +158,10 @@ global.fetch = async function reasonAwareFetch(input, init = {}) {
     ? regionalDiscovery.buildScanRegions(sourceText)
     : [];
   const context = requestContext.getStore();
-  const intensive = isAnnotation
+  const comprehensive = isAnnotation
     && intensiveMode.isIntensive(context?.extractionMode)
     && !intensiveMode.isTooLong(sourceText);
-  const hardMaximum = intensive
+  const hardMaximum = comprehensive
     ? intensiveMode.intensiveCandidateMaximum(sourceText)
     : selection.candidateDiscoveryTarget(sourceText);
   const broadPrompt = isAnnotation
@@ -135,11 +173,12 @@ global.fetch = async function reasonAwareFetch(input, init = {}) {
         hardMaximum,
       })
     : broadPrompt;
+  const noteAwarePrompt = intensiveMode.rewriteOptionalNotePrompt(regionalPrompt);
   rewriteSystemPrompt(
     modifiedBody,
-    intensive
-      ? intensiveMode.augmentAnnotationPrompt(regionalPrompt, { hardMaximum })
-      : regionalPrompt,
+    comprehensive
+      ? intensiveMode.augmentAnnotationPrompt(noteAwarePrompt, { hardMaximum })
+      : noteAwarePrompt,
   );
   if (isAnnotation) rewriteUserPayload(modifiedBody, {
     ...originalUserPayload,
@@ -176,7 +215,7 @@ global.fetch = async function reasonAwareFetch(input, init = {}) {
     parsed.annotations = flattened.annotations;
     parsed._regionalDiscovery = {
       ...flattened.telemetry,
-      extractionMode: intensive ? intensiveMode.INTENSIVE_MODE : intensiveMode.STANDARD_MODE,
+      extractionMode: comprehensive ? intensiveMode.INTENSIVE_MODE : intensiveMode.STANDARD_MODE,
       hardMaximum,
     };
     delete parsed.regions;
