@@ -113,6 +113,7 @@
       .then(() => loadScript("./reason-ui-localization.js"))
       .then(() => loadScript("./browser-import.js"))
       .then(() => loadScript("./display-settings-polish.js"))
+      .then(() => loadScript("./source-formatting-client.js"))
       .catch(() => {
         // Optional enhancement: the original app remains usable if these files fail to load.
       });
