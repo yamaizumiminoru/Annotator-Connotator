@@ -10,6 +10,7 @@
     "construction",
     "idiom",
     "term",
+    "added",
   ]);
   const legacyTypeMap = {
     vocab: "word",
