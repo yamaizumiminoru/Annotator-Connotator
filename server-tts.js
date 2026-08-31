@@ -4,4 +4,5 @@ const { installTtsServerPatch } = require("./lib/tts-server");
 installQuestionServerPatch();
 installTtsServerPatch();
 require("./server-note-policy");
+require("./server-source-formatting");
 require("./server-reason-selection");
