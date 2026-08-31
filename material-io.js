@@ -4,7 +4,7 @@
   if (root?.document) api.install(root);
 }(typeof globalThis !== "undefined" ? globalThis : this, () => {
   const MATERIAL_FORMAT = "annotator-connotator-material";
-  const MATERIAL_SCHEMA_VERSION = 1;
+  const MATERIAL_SCHEMA_VERSION = 2;
 
   function cloneJson(value) {
     return JSON.parse(JSON.stringify(value));
@@ -164,13 +164,6 @@
     }
 
     function applyImportedDisplaySettings(settings) {
-      const extractionMode = settings.extractionMode === "intensive" ? "intensive" : "standard";
-      if (root.INTENSIVE_MODE?.setMode) {
-        root.INTENSIVE_MODE.setMode(extractionMode, { adjustDensity: false });
-      } else {
-        root.localStorage.setItem("annotation.extractionMode", extractionMode);
-      }
-
       if (typeof settings.showExplanations === "boolean") {
         if (root.INTENSIVE_MODE?.setExplanationsVisible) {
           root.INTENSIVE_MODE.setExplanationsVisible(settings.showExplanations);
@@ -178,6 +171,14 @@
           root.localStorage.setItem("annotation.showExplanations", String(settings.showExplanations));
         }
       }
+    }
+
+    function importedDensity(settings) {
+      // v1 stored the old separate `intensive` mode while keeping density at 3.
+      // In v2 that exact state is represented by the single fourth density step, 網羅.
+      if (settings.extractionMode === "intensive") return "4";
+      const value = String(settings.density || "");
+      return ["1", "2", "3", "4"].includes(value) ? value : "2";
     }
 
     function applyImportedMaterial(material) {
@@ -190,7 +191,7 @@
       }
       if (["standard", "precise"].includes(settings.analysisMode)) setAnalysisMode(settings.analysisMode);
       applyImportedDisplaySettings(settings);
-      if (["1", "2", "3"].includes(String(settings.density))) els.densityRange.value = String(settings.density);
+      els.densityRange.value = importedDensity(settings);
       if (["1", "2", "3"].includes(String(settings.nuanceDetail))) els.nuanceRange.value = String(settings.nuanceDetail);
       if (["all", "speaking", "academic"].includes(settings.focus)) els.focusSelect.value = settings.focus;
       if (typeof settings.includeGrammar === "boolean") els.includeGrammar.checked = settings.includeGrammar;
@@ -205,7 +206,9 @@
       imported.slashReading = [];
       state.result = imported;
       els.sourceText.value = imported.sourceText;
+      root.INTENSIVE_MODE?.syncDensity?.();
       updateDensityLabel(false);
+      root.INTENSIVE_MODE?.syncDensity?.();
       updateNuanceLabel(false);
       renderResult();
       persistSettings();
