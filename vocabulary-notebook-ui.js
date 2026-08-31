@@ -79,6 +79,15 @@
     root.document.head.appendChild(core);
   }
 
+  function loadAnnotationWorkflowModule() {
+    if (root.document.querySelector('script[data-annotation-workflow="true"]')) return;
+    const script = root.document.createElement("script");
+    script.src = "./annotation-workflow.js";
+    script.async = false;
+    script.dataset.annotationWorkflow = "true";
+    root.document.head.appendChild(script);
+  }
+
   function resyncSelectedUiLanguage() {
     const select = root.document.getElementById("uiLangSelect");
     if (!select) return;
@@ -189,6 +198,7 @@
   preferLightColorScheme();
   loadUiPolishModule();
   loadIntensiveModeModule();
+  loadAnnotationWorkflowModule();
   loadMaterialIoModule();
   if (root.document.readyState === "loading") {
     root.document.addEventListener("DOMContentLoaded", install, { once: true });
