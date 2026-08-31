@@ -1,8 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  prepareCandidate,
   reasonProfile,
   selectAnnotationsByDensity,
+  visibleReasonTags,
 } = require("../lib/reason-selection");
 
 function candidate(id, text, overrides = {}) {
@@ -83,6 +85,25 @@ test("recognizes technical terms and reusable constructions as separate reasons"
   });
   assert.deepEqual(reasonProfile(twoWord, ["advanced"]).tags, ["術語"]);
   assert.deepEqual(reasonProfile(construction, ["advanced"]).tags, ["構文"]);
+});
+
+test("display tags suppress reasons already conveyed by the primary annotation type", () => {
+  assert.deepEqual(visibleReasonTags({ type: "construction" }, ["構文"]), []);
+  assert.deepEqual(visibleReasonTags({ type: "term" }, ["難語", "術語"]), ["難語"]);
+  assert.deepEqual(visibleReasonTags({ type: "idiom" }, ["慣用表現"]), []);
+  assert.deepEqual(visibleReasonTags({ type: "formula" }, ["慣用表現"]), ["慣用表現"]);
+});
+
+test("prepared candidates retain reason codes while removing redundant visible tags", () => {
+  const construction = candidate("a1", "would have been better if", {
+    type: "construction",
+    contextual: "advanced",
+    meaningType: "reusable_construction",
+    values: { beginner: "low", intermediate: "medium", advanced: "high" },
+  });
+  const prepared = prepareCandidate(construction, ["advanced"]);
+  assert.deepEqual(prepared.reasonTags, []);
+  assert.ok(prepared.selectionReasonCodes.includes("reusable-construction"));
 });
 
 test("density is a soft value threshold rather than a fixed 40/70/100 percent quota", () => {
