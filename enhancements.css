@@ -209,6 +209,22 @@
   background: transparent;
 }
 
+/* The same category chips filter the word-list cards, not only in-text highlighting. */
+.result-pane.filter-hide-vocab #wordList .word-card:has(.word-card-head > .badge.word),
+.result-pane.filter-hide-vocab #wordList .word-card:has(.word-card-head > .badge.term),
+.result-pane.filter-hide-phrase #wordList .word-card:has(.word-card-head > .badge.collocation),
+.result-pane.filter-hide-phrase #wordList .word-card:has(.word-card-head > .badge.formula),
+.result-pane.filter-hide-phrase #wordList .word-card:has(.word-card-head > .badge.idiom),
+.result-pane.filter-hide-grammar #wordList .word-card:has(.word-card-head > .badge.construction),
+.result-pane.filter-hide-nuance #wordList .word-card.nuance-card {
+  display: none;
+}
+
+/* A nuance attached to an otherwise visible annotation follows the nuance filter too. */
+.result-pane.filter-hide-nuance #wordList .word-card:not(.nuance-card) > .nuance-block {
+  display: none;
+}
+
 /* Removed features remain in the legacy DOM only so older client code stays safe. */
 .tab[data-tab="slash"][hidden],
 #panel-slash[hidden],
