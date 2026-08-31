@@ -428,8 +428,9 @@
       answer.insertAdjacentElement("afterend", button);
       button.addEventListener("click", () => addQuestionAnnotation(button));
     }
-    button.textContent = text("addAsAnnotation", "＋ アノテーションに追加", "+ Add as annotation");
-    button.disabled = false;
+    const label = text("addAsAnnotation", "＋ アノテーションに追加", "+ Add as annotation");
+    if (button.textContent !== label) button.textContent = label;
+    if (button.disabled) button.disabled = false;
   }
 
   function addQuestionAnnotation(button) {
@@ -464,11 +465,12 @@
   }
 
   function observeQuestionDialog() {
+    const answer = root.document.querySelector(".ac-question-answer");
+    if (!answer) return;
     const observer = new MutationObserver(() => {
-      const answer = root.document.querySelector(".ac-question-answer");
-      if (answer?.textContent?.trim() && lastQuestion?.answer) installQuestionAddButton();
+      if (answer.textContent?.trim() && lastQuestion?.answer) installQuestionAddButton();
     });
-    observer.observe(root.document.body, { childList: true, subtree: true, characterData: true });
+    observer.observe(answer, { childList: true, subtree: true, characterData: true });
   }
 
   function installRuntime() {
