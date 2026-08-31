@@ -1,4 +1,4 @@
-(function installIntensiveReadingMode(root) {
+(function installComprehensiveDensityMode(root) {
   if (!root?.document) return;
   const core = root.INTENSIVE_MODE_CORE;
   if (!core) return;
@@ -6,26 +6,18 @@
   root.UI_TEXT = root.UI_TEXT || {};
   root.UI_TEXT.ja = {
     ...(root.UI_TEXT.ja || {}),
-    extractionMode: "抽出方針",
-    extractionStandard: "通常",
-    extractionIntensive: "精読",
-    intensiveHint: "短い文章向け。候補を高密度に拾い、抽出量は自動で「多め」にします。",
-    intensiveTooLong: `精読モードは${core.INTENSIVE_MAX_SOURCE_LENGTH.toLocaleString("ja-JP")}文字以内の短い文章向けです。通常モードに切り替えるか、文章を短くしてください。`,
+    densityComprehensive: "網羅",
+    comprehensiveTooLong: `「網羅」は${core.INTENSIVE_MAX_SOURCE_LENGTH.toLocaleString("ja-JP")}文字以内の短い文章向けです。「多め」以下にするか、文章を短くしてください。`,
     showExplanations: "解説を表示",
   };
   root.UI_TEXT.en = {
     ...(root.UI_TEXT.en || {}),
-    extractionMode: "Extraction",
-    extractionStandard: "Standard",
-    extractionIntensive: "Close reading",
-    intensiveHint: "For short passages. Finds much denser teaching targets and automatically uses High density.",
-    intensiveTooLong: `Close-reading mode is for short passages up to ${core.INTENSIVE_MAX_SOURCE_LENGTH.toLocaleString("en-US")} characters. Switch to Standard or shorten the text.`,
+    densityComprehensive: "Comprehensive",
+    comprehensiveTooLong: `Comprehensive density is for short passages up to ${core.INTENSIVE_MAX_SOURCE_LENGTH.toLocaleString("en-US")} characters. Choose High or shorten the text.`,
     showExplanations: "Show explanations",
   };
 
-  let mode = core.normalizeMode(root.localStorage.getItem("annotation.extractionMode"));
   let explanationsVisible = root.localStorage.getItem("annotation.showExplanations") !== "false";
-  let previousDensity = root.localStorage.getItem("annotation.preIntensiveDensity") || "2";
   const previousFetch = root.fetch.bind(root);
 
   function currentUiLanguage() {
@@ -42,7 +34,7 @@
         if (translated && translated !== key) return translated;
       }
     } catch {
-      // Use English fallback for UI languages without a translated dynamic key.
+      // Use English fallback for dynamically added keys in other UI languages.
     }
     return fallbackEn;
   }
@@ -52,8 +44,6 @@
     const style = root.document.createElement("style");
     style.id = "intensiveModeStyles";
     style.textContent = `
-      .extraction-mode-control{margin-top:0}
-      .extraction-mode-hint{margin:7px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
       .teaching-display-toggle{display:flex;align-items:center;gap:7px}
       html.hide-annotation-explanations #panel-words .meaning,
       html.hide-annotation-explanations #panel-words .annotation-pattern,
@@ -69,37 +59,61 @@
     root.document.head.appendChild(style);
   }
 
-  function updateDensityForMode(nextMode, previousMode) {
-    const range = root.document.getElementById("densityRange");
+  function densityRange() {
+    return root.document.getElementById("densityRange");
+  }
+
+  function currentMode() {
+    return core.modeForDensity(densityRange()?.value || 2);
+  }
+
+  function syncDensityLabel() {
+    const range = densityRange();
+    const label = root.document.getElementById("densityLabel");
+    if (!range || !label) return;
+    if (core.isComprehensiveDensity(range.value)) {
+      label.textContent = text("densityComprehensive", "網羅", "Comprehensive");
+    }
+    root.localStorage.setItem("annotation.extractionMode", currentMode());
+  }
+
+  function migrateOldSeparateMode() {
+    const range = densityRange();
     if (!range) return;
-    if (core.isIntensive(nextMode)) {
-      if (!core.isIntensive(previousMode)) {
-        previousDensity = range.value || "2";
-        root.localStorage.setItem("annotation.preIntensiveDensity", previousDensity);
-      }
-      range.value = "3";
-    } else if (core.isIntensive(previousMode)) {
-      range.value = ["1", "2", "3"].includes(previousDensity) ? previousDensity : "2";
+    range.max = String(core.COMPREHENSIVE_DENSITY);
+    const oldMode = core.normalizeMode(root.localStorage.getItem("annotation.extractionMode"));
+    if (core.isIntensive(oldMode) && !core.isComprehensiveDensity(range.value)) {
+      range.value = String(core.COMPREHENSIVE_DENSITY);
+      root.localStorage.setItem("annotation.density", range.value);
     }
+    root.document.getElementById("extractionModeControl")?.remove();
     try {
-      if (typeof updateDensityLabel === "function") updateDensityLabel(true);
-      else range.dispatchEvent(new Event("input", { bubbles: true }));
+      if (typeof densityTextKeys === "object") densityTextKeys[core.COMPREHENSIVE_DENSITY] = "densityComprehensive";
     } catch {
-      range.dispatchEvent(new Event("input", { bubbles: true }));
+      // The main script may not have created the label map yet; direct relabeling below still works.
     }
+    syncDensityLabel();
   }
 
   function setMode(nextMode, options = {}) {
-    const previousMode = mode;
-    mode = core.normalizeMode(nextMode);
-    if (options.adjustDensity !== false) updateDensityForMode(mode, previousMode);
-    if (options.persist !== false) root.localStorage.setItem("annotation.extractionMode", mode);
-    root.document.querySelectorAll(".extraction-mode-segment").forEach((button) => {
-      const active = button.dataset.extractionMode === mode;
-      button.classList.toggle("active", active);
-      button.setAttribute("aria-pressed", String(active));
-    });
-    relabel();
+    const range = densityRange();
+    if (!range) return;
+    const normalized = core.normalizeMode(nextMode);
+    if (core.isIntensive(normalized)) {
+      range.value = String(core.COMPREHENSIVE_DENSITY);
+    } else if (core.isComprehensiveDensity(range.value)) {
+      range.value = "3";
+    }
+    if (options.persist !== false) {
+      root.localStorage.setItem("annotation.density", range.value);
+      root.localStorage.setItem("annotation.extractionMode", currentMode());
+    }
+    try {
+      if (typeof updateDensityLabel === "function") updateDensityLabel(options.persist !== false);
+    } catch {
+      // Direct relabel below is enough.
+    }
+    syncDensityLabel();
   }
 
   function setExplanationsVisible(visible, options = {}) {
@@ -113,39 +127,7 @@
   }
 
   function installControls() {
-    if (!root.document.getElementById("extractionModeControl")) {
-      const anchor = root.document.querySelector(".analysis-mode-segment")?.closest(".control-group");
-      if (anchor) {
-        const group = root.document.createElement("div");
-        group.id = "extractionModeControl";
-        group.className = "control-group extraction-mode-control";
-
-        const label = root.document.createElement("div");
-        label.className = "field-label";
-        label.dataset.intensiveI18n = "extractionMode";
-
-        const segmented = root.document.createElement("div");
-        segmented.className = "segmented";
-        segmented.setAttribute("role", "group");
-        segmented.setAttribute("aria-label", "Extraction mode");
-
-        for (const value of [core.STANDARD_MODE, core.INTENSIVE_MODE]) {
-          const button = root.document.createElement("button");
-          button.type = "button";
-          button.className = "segment extraction-mode-segment";
-          button.dataset.extractionMode = value;
-          button.addEventListener("click", () => setMode(value));
-          segmented.appendChild(button);
-        }
-
-        const hint = root.document.createElement("p");
-        hint.id = "intensiveModeHint";
-        hint.className = "extraction-mode-hint";
-        group.append(label, segmented, hint);
-        anchor.insertAdjacentElement("afterend", group);
-      }
-    }
-
+    root.document.getElementById("extractionModeControl")?.remove();
     if (!root.document.getElementById("showExplanations")) {
       const toggleGrid = root.document.querySelector(".toggle-grid");
       if (toggleGrid) {
@@ -164,36 +146,20 @@
   }
 
   function relabel() {
-    const label = root.document.querySelector('[data-intensive-i18n="extractionMode"]');
-    const standard = root.document.querySelector('[data-extraction-mode="standard"]');
-    const intensive = root.document.querySelector('[data-extraction-mode="intensive"]');
-    const hint = root.document.getElementById("intensiveModeHint");
     const show = root.document.querySelector('[data-intensive-i18n="showExplanations"]');
-    if (label) label.textContent = text("extractionMode", "抽出方針", "Extraction");
-    if (standard) standard.textContent = text("extractionStandard", "通常", "Standard");
-    if (intensive) intensive.textContent = text("extractionIntensive", "精読", "Close reading");
-    if (hint) {
-      hint.textContent = core.isIntensive(mode)
-        ? text(
-          "intensiveHint",
-          "短い文章向け。候補を高密度に拾い、抽出量は自動で「多め」にします。",
-          "For short passages. Finds much denser teaching targets and automatically uses High density.",
-        )
-        : "";
-      hint.hidden = !core.isIntensive(mode);
-    }
     if (show) show.textContent = text("showExplanations", "解説を表示", "Show explanations");
+    syncDensityLabel();
   }
 
   function tooLongMessage() {
     return text(
-      "intensiveTooLong",
-      `精読モードは${core.INTENSIVE_MAX_SOURCE_LENGTH.toLocaleString("ja-JP")}文字以内の短い文章向けです。通常モードに切り替えるか、文章を短くしてください。`,
-      `Close-reading mode is for short passages up to ${core.INTENSIVE_MAX_SOURCE_LENGTH.toLocaleString("en-US")} characters. Switch to Standard or shorten the text.`,
+      "comprehensiveTooLong",
+      `「網羅」は${core.INTENSIVE_MAX_SOURCE_LENGTH.toLocaleString("ja-JP")}文字以内の短い文章向けです。「多め」以下にするか、文章を短くしてください。`,
+      `Comprehensive density is for short passages up to ${core.INTENSIVE_MAX_SOURCE_LENGTH.toLocaleString("en-US")} characters. Choose High or shorten the text.`,
     );
   }
 
-  root.fetch = async function intensiveAwareFetch(input, init) {
+  root.fetch = async function comprehensiveAwareFetch(input, init) {
     let url;
     try {
       url = new URL(typeof input === "string" ? input : input.url, root.location.href);
@@ -211,37 +177,38 @@
     } catch {
       return previousFetch(input, init);
     }
-    payload.extractionMode = mode;
-    if (core.isIntensive(mode)) {
-      if (core.isTooLong(payload.text)) {
-        return new Response(JSON.stringify({
-          error: "intensive_too_long",
-          message: tooLongMessage(),
-        }), {
-          status: 400,
-          headers: { "content-type": "application/json; charset=utf-8" },
-        });
-      }
-      payload.density = 3;
+    const comprehensive = core.isComprehensiveDensity(payload.density ?? densityRange()?.value);
+    payload.extractionMode = comprehensive ? core.INTENSIVE_MODE : core.STANDARD_MODE;
+    if (comprehensive && core.isTooLong(payload.text)) {
+      return new Response(JSON.stringify({
+        error: "comprehensive_too_long",
+        message: tooLongMessage(),
+      }), {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
     }
     return previousFetch(input, { ...init, body: JSON.stringify(payload) });
   };
 
   function install() {
     installStyles();
+    migrateOldSeparateMode();
     installControls();
-    setMode(mode, { adjustDensity: false, persist: false });
-    if (core.isIntensive(mode)) updateDensityForMode(mode, core.STANDARD_MODE);
     setExplanationsVisible(explanationsVisible, { persist: false });
+    const range = densityRange();
+    range?.addEventListener("input", () => root.setTimeout(syncDensityLabel, 0));
     relabel();
     root.document.getElementById("uiLangSelect")?.addEventListener("change", () => root.setTimeout(relabel, 0));
   }
 
   root.INTENSIVE_MODE = {
-    getMode: () => mode,
+    getMode: currentMode,
     getExplanationsVisible: () => explanationsVisible,
+    isComprehensive: () => core.isComprehensiveDensity(densityRange()?.value),
     setMode,
     setExplanationsVisible,
+    syncDensity: syncDensityLabel,
   };
 
   if (root.document.readyState === "loading") {
