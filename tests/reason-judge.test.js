@@ -47,7 +47,7 @@ test("broad discovery prompt removes the hard learner floor but protects connota
   assert.doesNotMatch(broadened, /Treat the target level as a knowledge floor/);
 });
 
-test("applies judgments to already-discovered candidates without changing their spans", () => {
+test("applies judgments without changing spans and hides redundant display reasons", () => {
   const annotations = [{ id: "a1", text: "brain plasticity", type: "term", start: 10, end: 26, priority: 3 }];
   const judgments = [{
     id: "a1",
@@ -64,7 +64,8 @@ test("applies judgments to already-discovered candidates without changing their 
   const applied = applyJudgments(annotations, judgments, ["advanced"]);
   assert.equal(applied[0].start, 10);
   assert.equal(applied[0].end, 26);
-  assert.deepEqual(applied[0].reasonTags, ["難語", "術語"]);
+  assert.deepEqual(applied[0].reasonTags, ["難語"]);
+  assert.ok(applied[0].selectionReasonCodes.includes("technical-term"));
   assert.equal(applied[0].priority, 5);
 });
 
