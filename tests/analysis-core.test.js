@@ -27,7 +27,7 @@ test("aggregates model and repair usage without losing detail counters", () => {
 
 test("medium passages enter exhaustive section analysis instead of waiting for 18k characters", () => {
   assert.equal(LONG_FORM_THRESHOLD, 3_200);
-  assert.equal(CACHE_SCHEMA_VERSION, "analysis-v2");
+  assert.equal(CACHE_SCHEMA_VERSION, "analysis-v3");
 });
 
 test("cache material ignores display-only density but includes model-affecting settings", () => {

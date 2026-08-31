@@ -109,7 +109,7 @@ test("pedagogical priority outranks raw reliability", () => {
   assert.equal(low[0].text, "systematic evidence");
 });
 
-test("merges completion results without duplicate or overlapping ordinary annotations", () => {
+test("merges completion results without exact duplicates while preserving useful overlaps", () => {
   const existing = [annotation("first language acquisition"), annotation("systematic evidence")];
   const additions = [
     annotation("first language acquisition"),
@@ -123,9 +123,11 @@ test("merges completion results without duplicate or overlapping ordinary annota
   assert.deepEqual(merged.map((item) => item.text), [
     "first language acquisition",
     "systematic evidence",
+    "language acquisition",
     "child language corpora",
     "draw reliable conclusions",
   ]);
+  assert.equal(merged.filter((item) => item.text === "first language acquisition").length, 1);
 });
 
 test("later completion candidates are globally ranked before density selection", () => {
