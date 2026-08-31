@@ -16,6 +16,21 @@
     }
   }
 
+  function installPopupVisibilityOverride() {
+    if (root.document.getElementById("popupExplanationVisibilityOverride")) return;
+    const style = root.document.createElement("style");
+    style.id = "popupExplanationVisibilityOverride";
+    style.textContent = `
+      html.hide-annotation-explanations .popup .popup-def,
+      html.hide-annotation-explanations .popup .popup-pattern,
+      html.hide-annotation-explanations .popup .popup-note,
+      html.hide-annotation-explanations .popup .popup-ex,
+      html.hide-annotation-explanations .popup .popup-nuances,
+      html.hide-annotation-explanations .annotation-stack-body{display:block!important}
+    `;
+    root.document.head.appendChild(style);
+  }
+
   function relabelTranslationGeneration() {
     patchLabelCatalog();
     const labelText = root.document.querySelector('label:has(#includeTranslation) [data-i18n="includeTranslation"]');
@@ -94,6 +109,7 @@
 
   function install() {
     patchLabelCatalog();
+    installPopupVisibilityOverride();
     refresh();
 
     root.document.getElementById("uiLangSelect")?.addEventListener("change", () => {
