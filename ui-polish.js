@@ -171,7 +171,9 @@
     allButton.dataset.highlightFilter = "all";
     allButton.setAttribute("aria-pressed", "true");
     allButton.addEventListener("click", () => {
-      filterDefinitions.forEach(({ key }) => enabledFilters.add(key));
+      const allEnabled = enabledFilters.size === filterDefinitions.length;
+      if (allEnabled) enabledFilters.clear();
+      else filterDefinitions.forEach(({ key }) => enabledFilters.add(key));
       updateFilterVisibility();
       updateFilterButtons();
     });
