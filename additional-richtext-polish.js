@@ -38,6 +38,11 @@
       .ac-added-rich-content blockquote{margin:.7em 0;padding-left:.9em;border-left:3px solid rgba(0,0,0,.18);opacity:.9}
       .ac-added-rich-content code{padding:.08em .28em;border-radius:4px;background:color-mix(in srgb, CanvasText 7%, Canvas);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
       .annotation-stack-rich-answer{margin:7px 0;line-height:1.65}
+      html.hide-annotation-explanations .popup .popup-def[hidden],
+      html.hide-annotation-explanations .popup .popup-pattern[hidden],
+      html.hide-annotation-explanations .popup .popup-note[hidden],
+      html.hide-annotation-explanations .popup .popup-ex[hidden],
+      html.hide-annotation-explanations .popup .popup-nuances[hidden]{display:none!important}
     `;
     root.document.head.appendChild(style);
   }
