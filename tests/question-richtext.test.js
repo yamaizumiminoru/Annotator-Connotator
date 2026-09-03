@@ -12,6 +12,7 @@ test("question answers are rendered as safe rich text instead of raw markdown", 
   assert.match(source, /createElement\("li"\)/);
   assert.match(source, /querySelector\("\.ac-question-answer"\)/);
   assert.match(source, /observer\.disconnect\(\)/);
-  assert.match(source, /root\.AC_RICH_TEXT = \{ render: renderRichText \}/);
+  assert.match(source, /root\.AC_RICH_TEXT = root\.AC_RICH_TEXT \|\| \{ render: renderRichText \}/);
+  assert.match(source, /const renderer = root\.AC_RICH_TEXT\?\.render \|\| renderRichText/);
   assert.doesNotMatch(source, /answer\.innerHTML\s*=/);
 });
