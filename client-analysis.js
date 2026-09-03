@@ -113,6 +113,7 @@
       .then(() => loadScript("./reason-ui-localization.js"))
       .then(() => loadScript("./browser-import.js"))
       .then(() => loadScript("./display-settings-polish.js"))
+      .then(() => loadScript("./math-richtext.js"))
       .then(() => loadScript("./additional-richtext-polish.js"))
       .then(() => loadScript("./source-formatting-client.js"))
       .catch(() => {
