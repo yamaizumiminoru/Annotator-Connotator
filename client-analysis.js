@@ -115,6 +115,8 @@
       .then(() => loadScript("./display-settings-polish.js"))
       .then(() => loadScript("./additional-richtext-polish.js"))
       .then(() => loadScript("./source-formatting-client.js"))
+      .then(() => loadScript("./reading-difficulty.js"))
+      .then(() => loadScript("./reading-difficulty-visual.js"))
       .catch(() => {
         // Optional enhancement: the original app remains usable if these files fail to load.
       });
