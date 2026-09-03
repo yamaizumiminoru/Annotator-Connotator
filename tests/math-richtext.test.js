@@ -50,11 +50,26 @@ test("math renderer is loaded after shared rich text and before saved-answer pol
   assert.ok(display >= 0 && mathIndex > display && added > mathIndex);
 });
 
-test("math rendering keeps a safe raw-TeX fallback", () => {
+test("question observer delegates to the current shared rich-text renderer", () => {
+  const source = read("display-settings-polish.js");
+  assert.match(source, /const renderer = root\.AC_RICH_TEXT\?\.render \|\| renderRichText/);
+  assert.match(source, /observer\.disconnect\(\)[\s\S]*renderer\(answer, raw\)[\s\S]*observer\.observe/);
+});
+
+test("math layer does not install a second question MutationObserver", () => {
+  const source = read("math-richtext.js");
+  assert.doesNotMatch(source, /mathRichTextObserverInstalled/);
+  assert.doesNotMatch(source, /attributeFilter:\s*\["data-rich-text-source"\]/);
+  assert.doesNotMatch(source, /installQuestionSync/);
+});
+
+test("math rendering keeps a safe raw-TeX fallback and avoids async DOM rewrites", () => {
   const source = read("math-richtext.js");
   assert.match(source, /trust:\s*false/);
   assert.match(source, /throwOnError:\s*true/);
   assert.match(source, /node\.textContent = item\.raw/);
-  assert.match(source, /data-rich-text-source/);
+  assert.match(source, /const katex = root\.katex/);
+  assert.match(source, /ensureKatex\(root\)\.catch\(\(\) => \{\}\)/);
+  assert.doesNotMatch(source, /ensureKatex\(root\)\.then\(\(katex\)/);
   assert.doesNotMatch(source, /\.innerHTML\s*=/);
 });
