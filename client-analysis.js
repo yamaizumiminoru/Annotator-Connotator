@@ -118,6 +118,7 @@
       .then(() => loadScript("./source-formatting-client.js"))
       .then(() => loadScript("./reading-difficulty.js"))
       .then(() => loadScript("./reading-difficulty-visual.js"))
+      .then(() => loadScript("./tab-toolbar-polish.js"))
       .catch(() => {
         // Optional enhancement: the original app remains usable if these files fail to load.
       });
