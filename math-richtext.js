@@ -114,45 +114,32 @@
 
   function renderMathNodes(root, nodes) {
     if (!nodes.length) return;
-    ensureKatex(root).then((katex) => {
-      for (const node of nodes) {
-        const item = node.__acMathItem;
-        if (!item || !node.isConnected) continue;
-        try {
-          katex.render(item.tex, node, {
-            displayMode: item.display,
-            throwOnError: true,
-            trust: false,
-            strict: "warn",
-          });
-        } catch {
-          node.textContent = item.raw;
-        }
+    const katex = root.katex;
+    if (!katex?.render) {
+      ensureKatex(root).catch(() => {});
+      return;
+    }
+    for (const node of nodes) {
+      const item = node.__acMathItem;
+      if (!item || !node.isConnected) continue;
+      try {
+        katex.render(item.tex, node, {
+          displayMode: item.display,
+          throwOnError: true,
+          trust: false,
+          strict: "warn",
+        });
+      } catch {
+        node.textContent = item.raw;
       }
-    }).catch(() => {
-      // Keep the original TeX delimiters visible when the optional renderer cannot load.
-    });
-  }
-
-  function installQuestionSync(root, render) {
-    const answer = root.document.querySelector(".ac-question-answer");
-    if (!answer || answer.dataset.mathRichTextObserverInstalled === "true") return;
-    answer.dataset.mathRichTextObserverInstalled = "true";
-    const refresh = () => {
-      const raw = String(answer.dataset.richTextSource || "");
-      if (raw.trim()) render(answer, raw);
-    };
-    const observer = new MutationObserver((records) => {
-      if (records.some((record) => record.type === "attributes" && record.attributeName === "data-rich-text-source")) refresh();
-    });
-    observer.observe(answer, { attributes: true, attributeFilter: ["data-rich-text-source"] });
-    refresh();
+    }
   }
 
   function install(root) {
     if (root.__mathRichTextInstalled) return;
     root.__mathRichTextInstalled = true;
     installStyles(root);
+    ensureKatex(root).catch(() => {});
 
     let attempts = 0;
     const patch = () => {
@@ -162,10 +149,7 @@
         if (attempts < 80) root.setTimeout(patch, 50);
         return;
       }
-      if (shared.render.__mathAware) {
-        installQuestionSync(root, shared.render);
-        return;
-      }
+      if (shared.render.__mathAware) return;
       const previous = shared.render;
       const render = function mathAwareRichText(container, source) {
         const extracted = extractMath(source);
@@ -175,7 +159,6 @@
       };
       render.__mathAware = true;
       shared.render = render;
-      installQuestionSync(root, render);
     };
     patch();
   }

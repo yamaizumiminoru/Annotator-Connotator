@@ -144,7 +144,8 @@
     const answer = root.document.querySelector(".ac-question-answer");
     if (!answer || answer.dataset.richTextObserverInstalled === "true") return;
     answer.dataset.richTextObserverInstalled = "true";
-    root.AC_RICH_TEXT = { render: renderRichText };
+    root.AC_RICH_TEXT = root.AC_RICH_TEXT || { render: renderRichText };
+    if (typeof root.AC_RICH_TEXT.render !== "function") root.AC_RICH_TEXT.render = renderRichText;
 
     const observer = new MutationObserver(() => {
       const raw = answer.textContent || "";
@@ -153,7 +154,8 @@
         return;
       }
       observer.disconnect();
-      renderRichText(answer, raw);
+      const renderer = root.AC_RICH_TEXT?.render || renderRichText;
+      renderer(answer, raw);
       answer.dataset.richTextSource = raw;
       observer.observe(answer, { childList: true, subtree: true, characterData: true });
     });
