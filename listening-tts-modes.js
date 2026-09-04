@@ -7,11 +7,11 @@
   const DEFAULT_MODE = "natural";
   const MODEL = "gpt-4o-mini-tts";
   const SPEED = 1.0;
+  const MAX_CUSTOM_INSTRUCTIONS = 3000;
   const DB_NAME = "annotator-connotator-audio";
   const DB_VERSION = 1;
   const STORE_NAME = "tts-chunks";
   const MAX_CACHE_ENTRIES = 96;
-  const MAX_CUSTOM_INSTRUCTIONS = 3000;
 
   const UI = {
     ja: {
@@ -89,16 +89,8 @@
       || base.AI_TTS_DEFAULT_VOICE
       || "marin";
 
-    const deviceButton = root.document.createElement("button");
-    deviceButton.id = "speakBtn";
-    deviceButton.type = "button";
-    deviceButton.className = "ghost-btn tts-device-btn";
-
-    const aiButton = root.document.createElement("button");
-    aiButton.id = "aiSpeakBtn";
-    aiButton.type = "button";
-    aiButton.className = "ghost-btn tts-ai-btn";
-
+    const deviceButton = makeButton(root, "speakBtn", "ghost-btn tts-device-btn");
+    const aiButton = makeButton(root, "aiSpeakBtn", "ghost-btn tts-ai-btn");
     const modeWrap = root.document.createElement("div");
     modeWrap.className = "tts-mode-wrap";
     const modeLabel = root.document.createElement("span");
@@ -108,25 +100,20 @@
     modeGroup.setAttribute("role", "group");
 
     const savedMode = normalizeMode(root.localStorage?.getItem("annotation.ttsMode"));
-    for (const mode of MODES) {
+    MODES.forEach((mode) => {
       const button = root.document.createElement("button");
       button.type = "button";
       button.className = "tts-mode-button";
       button.dataset.ttsMode = mode;
       button.textContent = mode[0].toUpperCase() + mode.slice(1);
-      button.classList.toggle("active", mode === savedMode);
-      button.setAttribute("aria-pressed", String(mode === savedMode));
-      button.addEventListener("click", () => {
-        if (aiRunning) return;
-        setMode(root, modeGroup, mode);
-      });
+      const active = mode === savedMode;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
       modeGroup.appendChild(button);
-    }
+    });
     modeWrap.append(modeLabel, modeGroup);
 
-    const promptButton = root.document.createElement("button");
-    promptButton.type = "button";
-    promptButton.className = "ghost-btn tts-prompt-button";
+    const promptButton = makeButton(root, "ttsPromptButton", "ghost-btn tts-prompt-button");
     promptButton.setAttribute("aria-expanded", "false");
 
     const voiceSelect = root.document.createElement("select");
@@ -141,7 +128,6 @@
     voiceSelect.value = [...voiceSelect.options].some((option) => option.value === previousVoice)
       ? previousVoice
       : (base.AI_TTS_DEFAULT_VOICE || "marin");
-    voiceSelect.addEventListener("change", () => root.localStorage?.setItem("annotation.ttsVoice", voiceSelect.value));
 
     const promptPanel = root.document.createElement("div");
     promptPanel.className = "tts-prompt-panel";
@@ -152,10 +138,6 @@
     promptInput.rows = 2;
     promptInput.maxLength = MAX_CUSTOM_INSTRUCTIONS;
     promptInput.value = root.localStorage?.getItem("annotation.ttsCustomInstructions") || "";
-    promptInput.addEventListener("input", () => {
-      root.localStorage?.setItem("annotation.ttsCustomInstructions", promptInput.value);
-      updatePromptState(promptButton, promptInput);
-    });
     promptPanel.appendChild(promptInput);
 
     controls.replaceChildren(deviceButton, aiButton, modeWrap, promptButton, voiceSelect, promptPanel);
@@ -165,8 +147,18 @@
     let controller = null;
     let currentAudio = null;
     let currentAudioUrl = "";
-    let serial = 0;
+    let runSerial = 0;
 
+    modeGroup.addEventListener("click", (event) => {
+      const button = event.target.closest?.(".tts-mode-button");
+      if (!button || aiRunning) return;
+      setMode(root, modeGroup, button.dataset.ttsMode);
+    });
+    voiceSelect.addEventListener("change", () => root.localStorage?.setItem("annotation.ttsVoice", voiceSelect.value));
+    promptInput.addEventListener("input", () => {
+      root.localStorage?.setItem("annotation.ttsCustomInstructions", promptInput.value);
+      updatePromptState(promptButton, promptInput);
+    });
     promptButton.addEventListener("click", () => {
       const open = promptPanel.hidden;
       promptPanel.hidden = !open;
@@ -179,7 +171,7 @@
         root.speechSynthesis?.cancel();
         deviceSpeaking = false;
         refreshUi();
-        setStatus(root, tr(root, "ttsDeviceStopped"), "");
+        setStatusBox(root, tr(root, "ttsDeviceStopped"), "");
         return;
       }
       stopAi(false);
@@ -187,42 +179,29 @@
       if (!text || !root.speechSynthesis || !root.SpeechSynthesisUtterance) return;
       const utterance = new root.SpeechSynthesisUtterance(text);
       const language = resolveLanguage(root, sourceLanguage, text);
-      const item = (root.LANGUAGE_CATALOG || []).find((entry) => entry.code === language);
-      if (item?.speech) utterance.lang = item.speech;
+      const catalogItem = (root.LANGUAGE_CATALOG || []).find((item) => item.code === language);
+      if (catalogItem?.speech) utterance.lang = catalogItem.speech;
+      const voice = matchingDeviceVoice(root, utterance.lang);
+      if (voice) utterance.voice = voice;
       utterance.rate = 1.0;
-      utterance.onend = () => {
-        deviceSpeaking = false;
-        refreshUi();
-      };
-      utterance.onerror = () => {
-        deviceSpeaking = false;
-        refreshUi();
-      };
+      utterance.onend = () => { deviceSpeaking = false; refreshUi(); };
+      utterance.onerror = () => { deviceSpeaking = false; refreshUi(); };
       root.speechSynthesis.cancel();
       root.speechSynthesis.speak(utterance);
       deviceSpeaking = true;
       refreshUi();
-      setStatus(root, tr(root, "ttsDevicePlaying"), "ok");
+      setStatusBox(root, tr(root, "ttsDevicePlaying"), "ok");
     });
 
     aiButton.addEventListener("click", async () => {
-      if (aiRunning) {
-        stopAi(true);
-        return;
-      }
+      if (aiRunning) { stopAi(true); return; }
       root.speechSynthesis?.cancel();
       deviceSpeaking = false;
       const text = sourceText.value.trim();
       if (!text) return;
       const language = resolveLanguage(root, sourceLanguage, text);
-      if (!language) {
-        setStatus(root, tr(root, "ttsLanguageUnknown"), "error");
-        return;
-      }
-      if (!base.isSupportedTtsLanguage(language)) {
-        setStatus(root, tr(root, "ttsLanguageUnsupported"), "error");
-        return;
-      }
+      if (!language) { setStatusBox(root, tr(root, "ttsLanguageUnknown"), "error"); return; }
+      if (!base.isSupportedTtsLanguage(language)) { setStatusBox(root, tr(root, "ttsLanguageUnsupported"), "error"); return; }
 
       const mode = currentMode(modeGroup);
       const customInstructions = normalizeCustomInstructions(promptInput.value);
@@ -232,16 +211,16 @@
 
       aiRunning = true;
       controller = new AbortController();
-      const run = ++serial;
+      const run = ++runSerial;
       setControlsDisabled(true);
       refreshUi();
 
       try {
         let completed = 0;
         let generated = 0;
-        setStatus(root, tr(root, "ttsGenerating", { completed, total: chunks.length }), "");
+        setStatusBox(root, tr(root, "ttsGenerating", { completed, total: chunks.length }), "");
         const blobs = await mapWithConcurrency(chunks, 3, async (chunk) => {
-          const result = await getOrCreateAudio(root, base, {
+          const result = await getOrCreateAudio(root, {
             text: chunk,
             language,
             voice,
@@ -251,21 +230,20 @@
           });
           if (!result.cached) generated += 1;
           completed += 1;
-          if (run === serial) setStatus(root, tr(root, "ttsGenerating", { completed, total: chunks.length }), "");
+          if (run === runSerial) setStatusBox(root, tr(root, "ttsGenerating", { completed, total: chunks.length }), "");
           return result.blob;
         });
-
-        if (run !== serial || controller.signal.aborted) return;
-        setStatus(root, tr(root, generated === 0 ? "ttsCacheHit" : "ttsPlaying"), "ok");
+        if (run !== runSerial || controller.signal.aborted) return;
+        setStatusBox(root, tr(root, generated === 0 ? "ttsCacheHit" : "ttsPlaying"), "ok");
         for (const blob of blobs) {
-          if (run !== serial || controller.signal.aborted) return;
+          if (run !== runSerial || controller.signal.aborted) return;
           await playBlob(root, blob, run);
         }
-        if (run === serial) setStatus(root, tr(root, "ttsFinished"), "ok");
+        if (run === runSerial) setStatusBox(root, tr(root, "ttsFinished"), "ok");
       } catch (error) {
-        if (error?.name !== "AbortError" && run === serial) setStatus(root, tr(root, "ttsFailed"), "error");
+        if (error?.name !== "AbortError" && run === runSerial) setStatusBox(root, tr(root, "ttsFailed"), "error");
       } finally {
-        if (run === serial) {
+        if (run === runSerial) {
           aiRunning = false;
           controller = null;
           releaseAudio();
@@ -286,14 +264,14 @@
 
     function stopAi(showStatus) {
       if (!aiRunning && !currentAudio) return;
-      serial += 1;
+      runSerial += 1;
       controller?.abort();
       controller = null;
       aiRunning = false;
       releaseAudio();
       setControlsDisabled(false);
       refreshUi();
-      if (showStatus) setStatus(root, tr(root, "ttsStopped"), "");
+      if (showStatus) setStatusBox(root, tr(root, "ttsStopped"), "");
     }
 
     function releaseAudio() {
@@ -315,7 +293,7 @@
         currentAudio = new rootObject.Audio(currentAudioUrl);
         currentAudio.onended = () => { releaseAudio(); resolve(); };
         currentAudio.onerror = () => { releaseAudio(); reject(new Error("audio playback failed")); };
-        if (run !== serial) { releaseAudio(); resolve(); return; }
+        if (run !== runSerial) { releaseAudio(); resolve(); return; }
         currentAudio.play().catch(reject);
       });
     }
@@ -332,11 +310,17 @@
     }
   }
 
+  function makeButton(root, id, className) {
+    const button = root.document.createElement("button");
+    button.id = id;
+    button.type = "button";
+    button.className = className;
+    return button;
+  }
+
   function installUiText(root) {
     root.UI_TEXT = root.UI_TEXT || {};
-    for (const language of ["ja", "en"]) {
-      root.UI_TEXT[language] = { ...(root.UI_TEXT[language] || {}), ...UI[language] };
-    }
+    for (const language of ["ja", "en"]) root.UI_TEXT[language] = { ...(root.UI_TEXT[language] || {}), ...UI[language] };
   }
 
   function installStyles(root) {
@@ -387,6 +371,14 @@
     return root.ANNOTATOR_TTS?.inferUnambiguousLanguage(text) || "";
   }
 
+  function matchingDeviceVoice(root, lang) {
+    const voices = root.speechSynthesis?.getVoices?.() || [];
+    const base = String(lang || "").split("-")[0];
+    return voices.find((voice) => voice.lang === lang)
+      || voices.find((voice) => voice.lang?.startsWith(`${base}-`))
+      || null;
+  }
+
   function tr(root, key, values = {}) {
     const lang = root.document.getElementById("uiLangSelect")?.value || "ja";
     let text = root.UI_TEXT?.[lang]?.[key] || root.UI_TEXT?.en?.[key] || UI.en[key] || key;
@@ -394,22 +386,18 @@
     return text;
   }
 
-  function setStatus(root, message, kind = "") {
-    try {
-      if (typeof setStatus === "function") { setStatus(message, kind); return; }
-    } catch {}
+  function setStatusBox(root, message, kind = "") {
     const box = root.document.getElementById("statusBox");
     if (!box) return;
     box.textContent = message;
     box.className = `status ${kind}`.trim();
   }
 
-  async function getOrCreateAudio(root, base, { text, language, voice, mode, customInstructions, signal }) {
+  async function getOrCreateAudio(root, { text, language, voice, mode, customInstructions, signal }) {
     const material = cacheMaterial({ text, language, model: MODEL, voice, speed: SPEED, mode, customInstructions });
     const key = await sha256Hex(root, material);
     const cached = await getCachedAudio(root, key);
     if (cached?.blob) return { blob: cached.blob, cached: true };
-
     const response = await root.fetch("/api/tts", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -431,10 +419,7 @@
     const text = String(value || "");
     if (!root.crypto?.subtle || typeof TextEncoder === "undefined") {
       let hash = 2166136261;
-      for (let index = 0; index < text.length; index += 1) {
-        hash ^= text.charCodeAt(index);
-        hash = Math.imul(hash, 16777619);
-      }
+      for (let i = 0; i < text.length; i += 1) { hash ^= text.charCodeAt(i); hash = Math.imul(hash, 16777619); }
       return `fallback-${text.length}-${(hash >>> 0).toString(16)}`;
     }
     const bytes = new TextEncoder().encode(text);
@@ -446,6 +431,13 @@
     if (!root.indexedDB) return Promise.resolve(null);
     return new Promise((resolve) => {
       const request = root.indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          const store = db.createObjectStore(STORE_NAME, { keyPath: "key" });
+          store.createIndex("savedAt", "savedAt", { unique: false });
+        }
+      };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => resolve(null);
       request.onblocked = () => resolve(null);
