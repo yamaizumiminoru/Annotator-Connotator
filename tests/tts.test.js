@@ -115,14 +115,29 @@ test("English-specific connected-speech instructions are not imposed on other la
   assert.match(japanese, /language's natural reductions/i);
 });
 
-test("custom TTS instructions are additive and bounded", () => {
+test("Custom replaces preset delivery instructions instead of being added to them", () => {
   const custom = "General American, relaxed conversation between friends.";
-  const instructions = server.buildSpeechInstructions({ mode: "casual", customInstructions: custom, language: "en" });
-  assert.match(instructions, /Additional delivery instructions from the user/);
+  const instructions = server.buildSpeechInstructions({ mode: "custom", customInstructions: custom, language: "en" });
+  assert.match(instructions, /instead of any preset delivery style/i);
   assert.match(instructions, /General American/);
   assert.match(instructions, /lexical content unchanged/i);
+  assert.doesNotMatch(instructions, /slightly relaxed pace/i);
+  assert.doesNotMatch(instructions, /ordinary fluent conversational delivery/i);
+  assert.doesNotMatch(instructions, /spontaneous conversational delivery/i);
+  assert.doesNotMatch(instructions, /H-dropping/i);
+  assert.equal(server.normalizeTtsMode("CUSTOM"), "custom");
   assert.equal(server.normalizeTtsMode("unknown"), "natural");
   assert.equal(server.normalizeCustomInstructions("x".repeat(5000)).length, server.MAX_TTS_CUSTOM_INSTRUCTIONS_CHARS);
+});
+
+test("preset modes ignore a supplied custom prompt at the server instruction layer", () => {
+  const instructions = server.buildSpeechInstructions({
+    mode: "clear",
+    customInstructions: "Speak extremely fast with heavy reductions.",
+    language: "en",
+  });
+  assert.match(instructions, /slightly relaxed pace/i);
+  assert.doesNotMatch(instructions, /extremely fast/i);
 });
 
 test("unsupported-language errors are UI messages, with Japanese and English fallbacks", () => {
