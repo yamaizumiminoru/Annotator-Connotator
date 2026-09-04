@@ -8,6 +8,9 @@
   const DEFAULT_MODE = "natural";
   const MODEL = "gpt-4o-mini-tts";
   const SPEED = 1.0;
+  // Bump this whenever the server-side TTS instruction template or preset prompts change.
+  // Custom prompt text itself is also part of the cache key, so editing Custom already regenerates audio.
+  const TTS_PROMPT_VERSION = "listening-prompts-2026-09-04-v1";
   const MAX_CUSTOM_INSTRUCTIONS = 3000;
   const DB_NAME = "annotator-connotator-audio";
   const DB_VERSION = 1;
@@ -64,7 +67,7 @@
     return normalizeMode(mode) === "custom" ? normalizeCustomInstructions(value) : "";
   }
 
-  function cacheMaterial({ text, language, model, voice, speed, mode, customInstructions } = {}) {
+  function cacheMaterial({ text, language, model, voice, speed, mode, customInstructions, promptVersion } = {}) {
     const normalizedMode = normalizeMode(mode);
     return JSON.stringify({
       text: String(text || ""),
@@ -74,6 +77,7 @@
       speed: Number(speed ?? SPEED),
       mode: normalizedMode,
       customInstructions: customInstructionsForMode(normalizedMode, customInstructions),
+      promptVersion: String(promptVersion || TTS_PROMPT_VERSION),
     });
   }
 
@@ -411,7 +415,7 @@
       throw error;
     }
     const blob = await response.blob();
-    await putCachedAudio(root, { key, blob, savedAt: Date.now(), model: MODEL, voice, language, mode: normalizeMode(mode) });
+    await putCachedAudio(root, { key, blob, savedAt: Date.now(), model: MODEL, voice, language, mode: normalizeMode(mode), promptVersion: TTS_PROMPT_VERSION });
     return { blob, cached: false };
   }
 
@@ -509,6 +513,7 @@
     MAX_CUSTOM_INSTRUCTIONS,
     MODES,
     PRESET_MODES,
+    TTS_PROMPT_VERSION,
     UI,
     cacheMaterial,
     customInstructionsForMode,

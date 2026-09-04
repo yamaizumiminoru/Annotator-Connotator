@@ -39,6 +39,34 @@ test("listening audio cache identity separates presets from Custom without promp
   assert.notEqual(natural, custom);
 });
 
+test("changing the TTS prompt generation invalidates preset audio cache", () => {
+  const base = {
+    text: "I'll go over the main branches of linguistics.",
+    language: "en",
+    model: "gpt-4o-mini-tts",
+    voice: "marin",
+    speed: 1,
+    mode: "casual",
+  };
+  const current = listening.cacheMaterial(base);
+  assert.match(current, new RegExp(listening.TTS_PROMPT_VERSION));
+  assert.notEqual(current, listening.cacheMaterial({ ...base, promptVersion: "next-prompt-generation" }));
+});
+
+test("changing Custom prompt text invalidates Custom audio cache", () => {
+  const base = {
+    text: "We could have just called him.",
+    language: "en",
+    model: "gpt-4o-mini-tts",
+    voice: "cedar",
+    speed: 1,
+    mode: "custom",
+  };
+  const first = listening.cacheMaterial({ ...base, customInstructions: "Speak very slowly." });
+  const second = listening.cacheMaterial({ ...base, customInstructions: "Speak very quickly." });
+  assert.notEqual(first, second);
+});
+
 test("custom delivery prompt is trimmed and bounded", () => {
   assert.equal(listening.normalizeCustomInstructions("  General American  "), "General American");
   assert.equal(listening.normalizeCustomInstructions("x".repeat(4000)).length, listening.MAX_CUSTOM_INSTRUCTIONS);
