@@ -69,7 +69,7 @@ test("AI audio cache identity includes text, language, model, voice, speed, and 
   assert.notEqual(first, client.cacheMaterial({ ...base, instructionVersion: "v2" }));
 });
 
-test("server speech payload is exact-reading MP3 at 1.00 speed with a safe voice fallback", () => {
+test("server speech payload defaults to natural exact reading", () => {
   const payload = server.buildSpeechPayload({
     text: "Read this exactly.",
     voice: "cedar",
@@ -82,9 +82,35 @@ test("server speech payload is exact-reading MP3 at 1.00 speed with a safe voice
   assert.equal(payload.speed, 1);
   assert.equal(payload.response_format, "mp3");
   assert.match(payload.instructions, /exactly as written/i);
-  assert.match(payload.instructions, /Do not translate/i);
+  assert.match(payload.instructions, /weak forms/i);
+  assert.match(payload.instructions, /lexical content unchanged/i);
   assert.equal(server.normalizeVoice("not-a-voice"), "marin");
   assert.equal(server.MAX_TTS_INPUT_CHARS, 4096);
+});
+
+test("server provides distinct clear, natural, and casual delivery instructions", () => {
+  const clear = server.buildSpeechInstructions({ mode: "clear" });
+  const natural = server.buildSpeechInstructions({ mode: "natural" });
+  const casual = server.buildSpeechInstructions({ mode: "casual" });
+  assert.match(clear, /slightly relaxed pace/i);
+  assert.match(clear, /avoid unusually strong reductions/i);
+  assert.match(natural, /normal pace/i);
+  assert.match(natural, /weak forms/i);
+  assert.match(casual, /spontaneous conversational/i);
+  assert.match(casual, /flapping/i);
+  assert.match(casual, /do not merely read the text faster/i);
+  assert.notEqual(clear, natural);
+  assert.notEqual(natural, casual);
+});
+
+test("custom TTS instructions are additive and bounded", () => {
+  const custom = "General American, relaxed conversation between friends.";
+  const instructions = server.buildSpeechInstructions({ mode: "casual", customInstructions: custom });
+  assert.match(instructions, /Additional delivery instructions from the user/);
+  assert.match(instructions, /General American/);
+  assert.match(instructions, /lexical content unchanged/i);
+  assert.equal(server.normalizeTtsMode("unknown"), "natural");
+  assert.equal(server.normalizeCustomInstructions("x".repeat(5000)).length, server.MAX_TTS_CUSTOM_INSTRUCTIONS_CHARS);
 });
 
 test("unsupported-language errors are UI messages, with Japanese and English fallbacks", () => {
@@ -94,10 +120,12 @@ test("unsupported-language errors are UI messages, with Japanese and English fal
   assert.match(client.UI_ADDITIONS.en.ttsLanguageUnsupported, /\{language\}/);
 });
 
-test("client enhancement loads TTS before localization supplementation", () => {
+test("client enhancement loads listening modes immediately after base TTS", () => {
   const source = fs.readFileSync(path.join(root, "client-analysis.js"), "utf8");
   const ttsIndex = source.indexOf('loadScript("./tts-client.js")');
+  const listeningIndex = source.indexOf('loadScript("./listening-tts-modes.js")');
   const localizationIndex = source.indexOf('loadScript("./reason-ui-localization.js")');
   assert.ok(ttsIndex >= 0);
-  assert.ok(localizationIndex > ttsIndex);
+  assert.ok(listeningIndex > ttsIndex);
+  assert.ok(localizationIndex > listeningIndex);
 });
