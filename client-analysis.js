@@ -110,6 +110,7 @@
     loadScript("./lib/reason-selection.js")
       .then(() => loadScript("./reason-selection-client.js"))
       .then(() => loadScript("./tts-client.js"))
+      .then(() => loadScript("./listening-tts-modes.js"))
       .then(() => loadScript("./reason-ui-localization.js"))
       .then(() => loadScript("./browser-import.js"))
       .then(() => loadScript("./display-settings-polish.js"))
