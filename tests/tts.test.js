@@ -75,6 +75,7 @@ test("server speech payload defaults to natural exact reading", () => {
     voice: "cedar",
     model: "gpt-4o-mini-tts",
     speed: 1,
+    language: "en",
   });
   assert.equal(payload.model, "gpt-4o-mini-tts");
   assert.equal(payload.input, "Read this exactly.");
@@ -89,23 +90,34 @@ test("server speech payload defaults to natural exact reading", () => {
 });
 
 test("server provides distinct clear, natural, and casual delivery instructions", () => {
-  const clear = server.buildSpeechInstructions({ mode: "clear" });
-  const natural = server.buildSpeechInstructions({ mode: "natural" });
-  const casual = server.buildSpeechInstructions({ mode: "casual" });
+  const clear = server.buildSpeechInstructions({ mode: "clear", language: "en" });
+  const natural = server.buildSpeechInstructions({ mode: "natural", language: "en" });
+  const casual = server.buildSpeechInstructions({ mode: "casual", language: "en" });
   assert.match(clear, /slightly relaxed pace/i);
-  assert.match(clear, /avoid unusually strong reductions/i);
+  assert.match(clear, /phrase boundaries/i);
   assert.match(natural, /normal pace/i);
   assert.match(natural, /weak forms/i);
   assert.match(casual, /spontaneous conversational/i);
   assert.match(casual, /flapping/i);
+  assert.match(casual, /H-dropping/i);
   assert.match(casual, /do not merely read the text faster/i);
   assert.notEqual(clear, natural);
   assert.notEqual(natural, casual);
 });
 
+test("English-specific connected-speech instructions are not imposed on other languages", () => {
+  const english = server.buildSpeechInstructions({ mode: "casual", language: "en" });
+  const japanese = server.buildSpeechInstructions({ mode: "casual", language: "ja" });
+  assert.match(english, /H-dropping/i);
+  assert.match(english, /flapping/i);
+  assert.doesNotMatch(japanese, /H-dropping/i);
+  assert.doesNotMatch(japanese, /flapping/i);
+  assert.match(japanese, /language's natural reductions/i);
+});
+
 test("custom TTS instructions are additive and bounded", () => {
   const custom = "General American, relaxed conversation between friends.";
-  const instructions = server.buildSpeechInstructions({ mode: "casual", customInstructions: custom });
+  const instructions = server.buildSpeechInstructions({ mode: "casual", customInstructions: custom, language: "en" });
   assert.match(instructions, /Additional delivery instructions from the user/);
   assert.match(instructions, /General American/);
   assert.match(instructions, /lexical content unchanged/i);
