@@ -3,7 +3,8 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root?.document) api.install(root);
 }(typeof globalThis !== "undefined" ? globalThis : this, () => {
-  const MODES = ["clear", "natural", "casual"];
+  const MODES = ["clear", "natural", "casual", "custom"];
+  const PRESET_MODES = new Set(["clear", "natural", "casual"]);
   const DEFAULT_MODE = "natural";
   const MODEL = "gpt-4o-mini-tts";
   const SPEED = 1.0;
@@ -18,9 +19,8 @@
       deviceSpeech: "端末音声",
       aiSpeech: "AI音声",
       ttsModeLabel: "読み方",
-      ttsPromptButton: "✎ 指示",
-      ttsPromptTitle: "読み方の追加指示を入力",
       ttsPromptPlaceholder: "例：General American寄りで、友人同士の会話のように。機能語は自然に弱化する。",
+      ttsCustomRequired: "Customでは読み方の指示を入力してください。",
       ttsGenerating: "AI音声を生成中... {completed}/{total}",
       ttsPlaying: "AI音声を再生中...",
       ttsCacheHit: "保存済みのAI音声を再生します。",
@@ -36,9 +36,8 @@
       deviceSpeech: "Device speech",
       aiSpeech: "AI speech",
       ttsModeLabel: "Delivery",
-      ttsPromptButton: "✎ Prompt",
-      ttsPromptTitle: "Additional speaking-style instructions",
       ttsPromptPlaceholder: "Example: General American, like relaxed conversation between friends; use natural weak forms.",
+      ttsCustomRequired: "Enter speaking-style instructions for Custom mode.",
       ttsGenerating: "Generating AI speech... {completed}/{total}",
       ttsPlaying: "Playing AI speech...",
       ttsCacheHit: "Playing saved AI speech.",
@@ -61,15 +60,20 @@
     return String(value || "").trim().slice(0, MAX_CUSTOM_INSTRUCTIONS);
   }
 
+  function customInstructionsForMode(mode, value) {
+    return normalizeMode(mode) === "custom" ? normalizeCustomInstructions(value) : "";
+  }
+
   function cacheMaterial({ text, language, model, voice, speed, mode, customInstructions } = {}) {
+    const normalizedMode = normalizeMode(mode);
     return JSON.stringify({
       text: String(text || ""),
       language: String(language || "").trim().toLowerCase(),
       model: String(model || MODEL),
       voice: String(voice || "marin"),
       speed: Number(speed ?? SPEED),
-      mode: normalizeMode(mode),
-      customInstructions: normalizeCustomInstructions(customInstructions),
+      mode: normalizedMode,
+      customInstructions: customInstructionsForMode(normalizedMode, customInstructions),
     });
   }
 
@@ -100,7 +104,7 @@
     modeGroup.setAttribute("role", "group");
 
     const savedMode = normalizeMode(root.localStorage?.getItem("annotation.ttsMode"));
-    MODES.forEach((mode) => {
+    for (const mode of MODES) {
       const button = root.document.createElement("button");
       button.type = "button";
       button.className = "tts-mode-button";
@@ -110,11 +114,8 @@
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
       modeGroup.appendChild(button);
-    });
+    }
     modeWrap.append(modeLabel, modeGroup);
-
-    const promptButton = makeButton(root, "ttsPromptButton", "ghost-btn tts-prompt-button");
-    promptButton.setAttribute("aria-expanded", "false");
 
     const voiceSelect = root.document.createElement("select");
     voiceSelect.id = "aiVoiceSelect";
@@ -131,7 +132,6 @@
 
     const promptPanel = root.document.createElement("div");
     promptPanel.className = "tts-prompt-panel";
-    promptPanel.hidden = true;
     const promptInput = root.document.createElement("textarea");
     promptInput.id = "ttsCustomInstructions";
     promptInput.className = "tts-prompt-input";
@@ -139,8 +139,9 @@
     promptInput.maxLength = MAX_CUSTOM_INSTRUCTIONS;
     promptInput.value = root.localStorage?.getItem("annotation.ttsCustomInstructions") || "";
     promptPanel.appendChild(promptInput);
+    promptPanel.hidden = savedMode !== "custom";
 
-    controls.replaceChildren(deviceButton, aiButton, modeWrap, promptButton, voiceSelect, promptPanel);
+    controls.replaceChildren(deviceButton, aiButton, modeWrap, voiceSelect, promptPanel);
 
     let deviceSpeaking = false;
     let aiRunning = false;
@@ -152,18 +153,12 @@
     modeGroup.addEventListener("click", (event) => {
       const button = event.target.closest?.(".tts-mode-button");
       if (!button || aiRunning) return;
-      setMode(root, modeGroup, button.dataset.ttsMode);
+      const mode = setMode(root, modeGroup, button.dataset.ttsMode);
+      syncPromptPanel(mode, true);
     });
     voiceSelect.addEventListener("change", () => root.localStorage?.setItem("annotation.ttsVoice", voiceSelect.value));
     promptInput.addEventListener("input", () => {
       root.localStorage?.setItem("annotation.ttsCustomInstructions", promptInput.value);
-      updatePromptState(promptButton, promptInput);
-    });
-    promptButton.addEventListener("click", () => {
-      const open = promptPanel.hidden;
-      promptPanel.hidden = !open;
-      promptButton.setAttribute("aria-expanded", String(open));
-      if (open) root.setTimeout(() => promptInput.focus(), 0);
     });
 
     deviceButton.addEventListener("click", () => {
@@ -204,7 +199,12 @@
       if (!base.isSupportedTtsLanguage(language)) { setStatusBox(root, tr(root, "ttsLanguageUnsupported"), "error"); return; }
 
       const mode = currentMode(modeGroup);
-      const customInstructions = normalizeCustomInstructions(promptInput.value);
+      const customInstructions = customInstructionsForMode(mode, promptInput.value);
+      if (mode === "custom" && !customInstructions) {
+        setStatusBox(root, tr(root, "ttsCustomRequired"), "error");
+        promptInput.focus();
+        return;
+      }
       const voice = voiceSelect.value || base.AI_TTS_DEFAULT_VOICE || "marin";
       const chunks = base.splitTextForTts(text);
       if (!chunks.length) return;
@@ -256,6 +256,12 @@
     uiLanguage?.addEventListener("change", () => root.setTimeout(refreshUi, 0));
     refreshUi();
 
+    function syncPromptPanel(mode, focus = false) {
+      const custom = normalizeMode(mode) === "custom";
+      promptPanel.hidden = !custom;
+      if (custom && focus) root.setTimeout(() => promptInput.focus(), 0);
+    }
+
     function setControlsDisabled(disabled) {
       voiceSelect.disabled = disabled;
       promptInput.disabled = disabled;
@@ -302,10 +308,7 @@
       deviceButton.textContent = `${deviceSpeaking ? "Ⅱ" : "▶"} ${tr(root, "deviceSpeech")}`;
       aiButton.textContent = `${aiRunning ? "■" : "✨"} ${tr(root, "aiSpeech")}`;
       modeLabel.textContent = tr(root, "ttsModeLabel");
-      promptButton.textContent = tr(root, "ttsPromptButton");
-      promptButton.title = tr(root, "ttsPromptTitle");
       promptInput.placeholder = tr(root, "ttsPromptPlaceholder");
-      updatePromptState(promptButton, promptInput);
       voiceSelect.setAttribute("aria-label", root.UI_TEXT?.[uiLanguage?.value || "ja"]?.aiVoice || "AI voice");
     }
   }
@@ -334,7 +337,6 @@
       .tts-mode-button{min-height:32px;padding:0 8px;border:0;border-right:1px solid var(--line);background:#fff;color:var(--muted);font:inherit;font-size:11px;cursor:pointer}
       .tts-mode-button:last-child{border-right:0}
       .tts-mode-button.active{background:var(--text);color:#fff}
-      .tts-prompt-button.has-prompt{border-color:#8c8164;background:#f4f0e4}
       .tts-prompt-panel{flex:1 0 100%;width:100%}
       .tts-prompt-panel[hidden]{display:none!important}
       .tts-prompt-input{box-sizing:border-box;width:100%;min-height:54px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:var(--text);font:inherit;font-size:12px;line-height:1.45}
@@ -355,10 +357,7 @@
       button.setAttribute("aria-pressed", String(active));
     });
     root.localStorage?.setItem("annotation.ttsMode", normalized);
-  }
-
-  function updatePromptState(button, input) {
-    button.classList.toggle("has-prompt", Boolean(normalizeCustomInstructions(input.value)));
+    return normalized;
   }
 
   function resolveLanguage(root, select, text) {
@@ -394,14 +393,15 @@
   }
 
   async function getOrCreateAudio(root, { text, language, voice, mode, customInstructions, signal }) {
-    const material = cacheMaterial({ text, language, model: MODEL, voice, speed: SPEED, mode, customInstructions });
+    const effectiveCustom = customInstructionsForMode(mode, customInstructions);
+    const material = cacheMaterial({ text, language, model: MODEL, voice, speed: SPEED, mode, customInstructions: effectiveCustom });
     const key = await sha256Hex(root, material);
     const cached = await getCachedAudio(root, key);
     if (cached?.blob) return { blob: cached.blob, cached: true };
     const response = await root.fetch("/api/tts", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, language, voice, model: MODEL, speed: SPEED, mode, customInstructions }),
+      body: JSON.stringify({ text, language, voice, model: MODEL, speed: SPEED, mode: normalizeMode(mode), customInstructions: effectiveCustom }),
       signal,
     });
     if (!response.ok) {
@@ -411,7 +411,7 @@
       throw error;
     }
     const blob = await response.blob();
-    await putCachedAudio(root, { key, blob, savedAt: Date.now(), model: MODEL, voice, language, mode });
+    await putCachedAudio(root, { key, blob, savedAt: Date.now(), model: MODEL, voice, language, mode: normalizeMode(mode) });
     return { blob, cached: false };
   }
 
@@ -508,8 +508,10 @@
     DEFAULT_MODE,
     MAX_CUSTOM_INSTRUCTIONS,
     MODES,
+    PRESET_MODES,
     UI,
     cacheMaterial,
+    customInstructionsForMode,
     install,
     normalizeCustomInstructions,
     normalizeMode,
