@@ -8,12 +8,16 @@ const {
   contextForCandidate,
 } = require("../lib/reason-judge");
 
-test("judge prompt explicitly decomposes lexical, contextual, domain, and per-band value", () => {
+test("judge prompt explicitly decomposes lexical, target, domain, and per-band value", () => {
   const prompt = buildJudgePrompt();
   assert.match(prompt, /componentLexicalBand/);
   assert.match(prompt, /contextualMeaningBand/);
   assert.match(prompt, /domainTerm/);
   assert.match(prompt, /annotationValueByBand/);
+  assert.match(prompt, /learning target the annotation actually teaches/);
+  assert.match(prompt, /basic construction remains basic even when one of its slots is filled by advanced vocabulary/i);
+  assert.match(prompt, /collocations, formulas, idioms, and other multiword candidates/i);
+  assert.match(prompt, /Never promote a construction, collocation, formula, idiom, or other multiword annotation/i);
   assert.match(prompt, /High frequency or reusability alone must not promote/);
 });
 
@@ -69,16 +73,45 @@ test("applies judgments without changing spans and hides redundant display reaso
   assert.equal(applied[0].priority, 5);
 });
 
-test("judge items contain context but not the first-pass gloss or note", () => {
-  const source = "A rule of thumb is useful in practice.";
-  const start = source.indexOf("rule of thumb");
-  const items = buildJudgeItems(source, [{
-    id: "a1",
-    text: "rule of thumb",
-    start,
-    end: start + 13,
-    meaningJa: "経験則",
-    noteJa: "first-pass opinion",
-  }]);
-  assert.deepEqual(Object.keys(items[0]).sort(), ["context", "id", "text"]);
+test("judge items expose the intended teaching target, not only the surface span", () => {
+  const source = "When contact intensifies, grammar may be borrowed. The family may reach all the way back to Latin.";
+  const constructionStart = source.indexOf("When contact intensifies");
+  const collocationStart = source.indexOf("reach all the way back");
+  const items = buildJudgeItems(source, [
+    {
+      id: "a1",
+      text: "When contact intensifies",
+      type: "construction",
+      start: constructionStart,
+      end: constructionStart + "When contact intensifies".length,
+      pattern: "when + subject + verb, main clause",
+      meaningJa: "接触が強まるとき",
+      noteJa: "when + 現在形で一般的な条件や時点を表す。",
+    },
+    {
+      id: "a2",
+      text: "reach all the way back",
+      type: "collocation",
+      start: collocationStart,
+      end: collocationStart + "reach all the way back".length,
+      pattern: "reach all the way back (to ...)",
+      meaningJa: "ずっと遡る",
+      noteJa: "起源や歴史が遠い過去まで遡ることを表す。",
+    },
+  ]);
+
+  assert.deepEqual(Object.keys(items[0]).sort(), [
+    "annotationType",
+    "context",
+    "id",
+    "meaning",
+    "note",
+    "pattern",
+    "text",
+  ]);
+  assert.equal(items[0].annotationType, "construction");
+  assert.equal(items[0].pattern, "when + subject + verb, main clause");
+  assert.match(items[0].note, /when \+ 現在形/);
+  assert.equal(items[1].annotationType, "collocation");
+  assert.equal(items[1].meaning, "ずっと遡る");
 });
