@@ -120,6 +120,7 @@
       .then(() => loadScript("./reading-difficulty.js"))
       .then(() => loadScript("./reading-difficulty-visual.js"))
       .then(() => loadScript("./tab-toolbar-polish.js"))
+      .then(() => loadScript("./overlap-popup-polish.js"))
       .catch(() => {
         // Optional enhancement: the original app remains usable if these files fail to load.
       });
