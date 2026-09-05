@@ -1,5 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 
 const reasonSelection = require("../lib/reason-selection");
 const advancedRecall = require("../server-advanced-recall");
@@ -33,7 +36,8 @@ test("judge prompt protects advanced literal words and introduced domain terms",
   const prompt = advancedRecall.strengthenJudgePrompt("base prompt");
   assert.match(prompt, /genuinely C1-C2\+ lexical burden/i);
   assert.match(prompt, /domain term that is explicitly introduced, named, defined, contrasted/i);
-  assert.match(prompt, /called X/);
+  assert.match(prompt, /cues in the source language/);
+  assert.match(prompt, /not a prerequisite for term eligibility/);
   assert.match(prompt, /not to basic constructions, collocations, or formulas/i);
 });
 
@@ -41,9 +45,12 @@ test("discovery prompt explicitly scans for missed advanced words and named term
   const prompt = advancedRecall.strengthenDiscoveryPrompt("base prompt");
   assert.match(prompt, /standalone advanced lexical items/i);
   assert.match(prompt, /rare, formal, academic, historical, technical/i);
-  assert.match(prompt, /linguists call X/);
+  assert.match(prompt, /terms used without an explicit definition/);
+  assert.match(prompt, /technical concept remains eligible when it includes a proper name/);
+  assert.match(prompt, /incidental names of people or places/);
   assert.match(prompt, /quotations, historical passages/i);
-  assert.match(prompt, /Do not pad with ordinary B1-B2 literal vocabulary/i);
+  assert.match(prompt, /Preserve useful beginner and intermediate words and expressions/);
+  assert.doesNotMatch(prompt, /Do not pad with ordinary B1-B2 literal vocabulary|called X|linguists call X/);
 });
 
 test("advanced lexical words are rescued at standard density even if judge value is too low", () => {
@@ -51,9 +58,9 @@ test("advanced lexical words are rescued at standard density even if judge value
     lexical: "advanced",
     triggers: ["philologer"],
   });
-  assert.equal(advancedRecall.isAdvancedRecallCandidate(philologer, 2, ["advanced"]), true);
-  assert.equal(advancedRecall.isAdvancedRecallCandidate(philologer, 1, ["advanced"]), false);
-  assert.equal(advancedRecall.isAdvancedRecallCandidate(philologer, 2, ["intermediate"]), false);
+  assert.equal(reasonSelection.selectAnnotationsByDensity([philologer], 2, ["advanced"]).length, 1);
+  assert.equal(reasonSelection.selectAnnotationsByDensity([philologer], 1, ["advanced"]).length, 0);
+  assert.equal(reasonSelection.selectAnnotationsByDensity([philologer], 2, ["intermediate"]).length, 0);
 });
 
 test("useful domain terms are rescued without reviving simple multiword patterns", () => {
@@ -78,12 +85,14 @@ test("useful domain terms are rescued without reviving simple multiword patterns
     meaningType: "compositional_phrase",
   });
 
-  assert.equal(advancedRecall.isAdvancedRecallCandidate(phoneme, 2, ["advanced"]), true);
-  assert.equal(advancedRecall.isAdvancedRecallCandidate(whenConstruction, 2, ["advanced"]), false);
-  assert.equal(advancedRecall.isAdvancedRecallCandidate(collocation, 2, ["advanced"]), false);
+  assert.deepEqual(
+    reasonSelection.selectAnnotationsByDensity([phoneme, whenConstruction, collocation], 2, ["advanced"])
+      .map((item) => item.text),
+    ["phoneme"],
+  );
 });
 
-test("merge restores only the advanced lexical/term misses and preserves source order", () => {
+test("shared selection restores only advanced lexical/term misses and preserves source order", () => {
   const kept = judgedCandidate("a1", "duality of patterning", "term", {
     domain: true,
     values: { beginner: "low", intermediate: "medium", advanced: "high" },
@@ -105,12 +114,70 @@ test("merge restores only the advanced lexical/term misses and preserves source 
     end: 85,
   });
 
-  const baseline = reasonSelection.selectAnnotationsByDensity([kept, missedWord, basicConstruction], 2, ["advanced"]);
-  const merged = advancedRecall.mergeAdvancedRecall(baseline, [kept, missedWord, basicConstruction], 2, ["advanced"]);
-  assert.deepEqual(merged.map((item) => item.id), ["a2", "a1"]);
+  const selected = reasonSelection.selectAnnotationsByDensity([kept, missedWord, basicConstruction], 2, ["advanced"]);
+  assert.deepEqual(selected.map((item) => item.id), ["a2", "a1"]);
 });
 
-test("server patch installation is idempotent", () => {
+test("server prompt patch installation is idempotent and does not replace shared selection", () => {
+  const select = reasonSelection.selectAnnotationsByDensity;
   assert.doesNotThrow(() => advancedRecall.installAdvancedRecallPatch());
   assert.doesNotThrow(() => advancedRecall.installAdvancedRecallPatch());
+  assert.equal(reasonSelection.selectAnnotationsByDensity, select);
+});
+
+test("browser redisplay and server agree for every learner-band combination and density", () => {
+  const browser = {};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../lib/reason-selection.js"), "utf8"), browser);
+  const candidates = [
+    judgedCandidate("a1", "初心者の学習対象", "word", {
+      lexical: "beginner",
+      values: { beginner: "high", intermediate: "low", advanced: "low" },
+    }),
+    judgedCandidate("a2", "cible intermédiaire", "idiom", {
+      meaningType: "idiom",
+      values: { beginner: "low", intermediate: "high", advanced: "low" },
+    }),
+    judgedCandidate("a3", "Fachwort", "word", { lexical: "advanced" }),
+    judgedCandidate("a4", "形態素", "term", { domain: true, meaningType: "domain_term" }),
+    judgedCandidate("a5", "when contact intensifies", "construction", {
+      lexical: "advanced", contextual: "beginner", meaningType: "reusable_construction",
+      values: { beginner: "high", intermediate: "low", advanced: "low" },
+    }),
+    judgedCandidate("a6", "more prestigious language", "collocation", {
+      lexical: "advanced", meaningType: "compositional_phrase",
+      values: { beginner: "low", intermediate: "medium", advanced: "low" },
+    }),
+    judgedCandidate("a7", "advanced target", "formula", {
+      contextual: "advanced", meaningType: "metaphorical_or_extended_sense",
+      values: { beginner: "low", intermediate: "low", advanced: "high" },
+    }),
+    judgedCandidate("a8", "uncertain lexical target", "word", { lexical: "advanced", confidence: "low" }),
+    judgedCandidate("a9", "uncertain domain target", "term", { domain: true, domainConfidence: "low" }),
+    judgedCandidate("a10", "familiar discourse marker", "formula", {
+      lexical: "beginner", contextual: "beginner", meaningType: "discourse_marker",
+      values: { beginner: "low", intermediate: "low", advanced: "medium" },
+    }),
+  ];
+  const original = JSON.stringify(candidates);
+  for (let mask = 1; mask < 8; mask += 1) {
+    const levels = ["beginner", "intermediate", "advanced"].filter((_, index) => mask & (1 << index));
+    for (const density of [1, 2, 3]) {
+      const expected = candidates.filter((item) => (
+        (levels.includes("beginner") && ["a1", "a5"].includes(item.id))
+        || (levels.includes("intermediate") && (item.id === "a2" || (density >= 2 && item.id === "a6")))
+        || (levels.includes("advanced") && (
+          item.id === "a7"
+          || (density >= 2 && ["a3", "a4"].includes(item.id))
+          || (density === 3 && item.id === "a10")
+        ))
+      )).map((item) => item.id);
+      const serverResult = reasonSelection.selectAnnotationsByDensity(candidates, density, levels);
+      // This is the browser's actual path: prepare and reselect the server's full pool.
+      const browserPool = candidates.map((item) => browser.REASON_SELECTION.prepareCandidate(item, levels));
+      const browserResult = browser.REASON_SELECTION.selectAnnotationsByDensity(browserPool, density, levels);
+      assert.deepEqual(serverResult.map((item) => item.id), expected, `${levels}: density ${density}`);
+      assert.equal(JSON.stringify(browserResult), JSON.stringify(serverResult), `${levels}: density ${density}`);
+    }
+  }
+  assert.equal(JSON.stringify(candidates), original, "display eligibility must not rewrite judge metadata");
 });
