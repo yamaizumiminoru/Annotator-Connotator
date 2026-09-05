@@ -48,8 +48,7 @@ function isAdvancedRecallCandidate(candidate, density, selectedLevels) {
   const type = String(candidate?.type || "");
 
   if (type === "word") {
-    return meta.componentLexicalBand === "advanced"
-      && meta.lexicalTriggerWords.length > 0;
+    return meta.componentLexicalBand === "advanced";
   }
 
   if (type === "term") {
