@@ -68,11 +68,79 @@ test("ordinary annotation can be recovered for a nuance-only rendered span", () 
   );
 });
 
-test("nuance-only visuals are upgraded to category background plus nuance underline", () => {
+test("partial ordinary overlap is discovered even when the nuance span is wider", () => {
+  const source = "He said, Don't ask.";
+  const start = source.indexOf("Don't ask");
+  const annotation = {
+    id: "dont-ask",
+    text: "Don't ask",
+    type: "collocation",
+    start,
+    end: start + "Don't ask".length,
+  };
+  const nuanceEnd = annotation.end + 1;
+
+  const overlaps = overlapPopup.findOverlappingAnnotations(
+    [annotation],
+    start,
+    nuanceEnd,
+    source,
+  );
+  assert.equal(overlaps.length, 1);
+  assert.equal(overlaps[0].item.id, "dont-ask");
+});
+
+test("partial overlap is split so only the ordinary target gets its category background", () => {
+  const source = "He said, Don't ask.";
+  const start = source.indexOf("Don't ask");
+  const annotation = {
+    id: "dont-ask",
+    text: "Don't ask",
+    type: "collocation",
+    start,
+    end: start + "Don't ask".length,
+  };
+  const plan = overlapPopup.planNuanceVisualSegments(
+    [annotation],
+    start,
+    annotation.end + 1,
+    source,
+  );
+
+  assert.deepEqual(plan.map((segment) => ({
+    text: source.slice(segment.start, segment.end),
+    annotationId: segment.annotation?.id || null,
+  })), [
+    { text: "Don't ask", annotationId: "dont-ask" },
+    { text: ".", annotationId: null },
+  ]);
+});
+
+test("matching annotation text can repair stale offsets", () => {
+  const source = "First Don't ask. Later Don't ask.";
+  const secondStart = source.lastIndexOf("Don't ask");
+  const annotation = {
+    id: "second",
+    text: "Don't ask",
+    type: "collocation",
+    start: 999,
+    end: 1008,
+  };
+  const overlaps = overlapPopup.findOverlappingAnnotations(
+    [annotation],
+    secondStart,
+    secondStart + "Don't ask".length,
+    source,
+  );
+  assert.equal(overlaps.some((item) => item.start === secondStart && item.item.id === "second"), true);
+});
+
+test("nuance-only visuals are upgraded or split into category background plus nuance underline", () => {
   const source = fs.readFileSync(path.join(root, "overlap-popup-polish.js"), "utf8");
   assert.match(source, /querySelectorAll\("\.nuance-only"\)/);
-  assert.match(source, /classList\.remove\("nuance-only"\)/);
-  assert.match(source, /classList\.add\("hl", `hl-\$\{annotationSpan\.item\.type\}`, "nuance-overlap"\)/);
+  assert.match(source, /planNuanceVisualSegments\(result\.annotations, range\.start, range\.end, source\)/);
+  assert.match(source, /piece\.classList\.add\("hl", `hl-\$\{segment\.annotation\.type\}`, "nuance-overlap"\)/);
+  assert.match(source, /target\.replaceWith\(fragment\)/);
   assert.match(source, /patchRenderer\(root, container\)/);
 });
 
