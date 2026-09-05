@@ -5,4 +5,5 @@ installQuestionServerPatch();
 installTtsServerPatch();
 require("./server-note-policy");
 require("./server-source-formatting");
+require("./server-advanced-recall");
 require("./server-reason-selection");
