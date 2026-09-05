@@ -1,21 +1,21 @@
 const targets = [
   {
     text: "When contact intensifies", type: "construction", pattern: "when + subject + present verb",
-    lexical: "advanced", contextual: "beginner", meaningType: "reusable_construction",
+    primary: "beginner", lexical: "advanced", contextual: "beginner", meaningType: "reusable_construction",
     values: { beginner: "high", intermediate: "low", advanced: "low" },
   },
-  { text: "intensifies", type: "word", lexical: "advanced" },
+  { text: "intensifies", type: "word", primary: "advanced", lexical: "advanced" },
   {
-    text: "take into account", type: "collocation", lexical: "beginner", contextual: "intermediate",
+    text: "take into account", type: "collocation", primary: "intermediate", lexical: "beginner", contextual: "intermediate",
     meaningType: "idiom", values: { beginner: "low", intermediate: "high", advanced: "low" },
   },
-  { text: "phonèmes", type: "term", domain: true, meaningType: "domain_term" },
+  { text: "phonèmes", type: "term", primary: "advanced", domain: true, meaningType: "domain_term" },
   {
-    text: "in principle", type: "formula", lexical: "beginner", meaningType: "discourse_marker",
+    text: "in principle", type: "formula", primary: "intermediate", lexical: "beginner", meaningType: "discourse_marker",
     values: { beginner: "low", intermediate: "medium", advanced: "low" },
   },
   {
-    text: "counterfactual", type: "word", lexical: "advanced",
+    text: "counterfactual", type: "word", primary: "advanced", lexical: "advanced",
     values: { beginner: "low", intermediate: "low", advanced: "high" },
   },
 ];
@@ -65,6 +65,7 @@ global.fetch = async (url, init) => {
       if (!target) throw new Error("Unexpected candidate in mocked judge");
       return {
         id: candidate.id,
+        primaryLearnerBand: target.primary || "intermediate",
         componentLexicalBand: target.lexical || "intermediate",
         contextualMeaningBand: target.contextual || "intermediate",
         lexicalTriggerWords: [], domainTerm: target.domain === true, domainTermConfidence: "high",
