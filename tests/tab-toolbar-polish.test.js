@@ -19,6 +19,13 @@ test("result toolbar groups controls by the tab where they are useful", () => {
   assert.match(source, /actions\.hidden = active !== "annotated"/);
 });
 
+test("Custom TTS prompt expands below TTS controls without moving the reading action", () => {
+  const source = read("tab-toolbar-polish.js");
+  assert.match(source, /\.tab-specific-actions\{display:grid;grid-template-columns:max-content max-content/);
+  assert.match(source, /\.tab-specific-toolbar \.tts-controls\{display:grid;grid-template-columns:max-content max-content max-content max-content/);
+  assert.match(source, /\.tts-controls \.tts-prompt-panel\{grid-column:1\/-1;width:100%;min-width:0\}/);
+});
+
 test("word explanation toggle is hidden on the text tab but remains in the shared filter bar", () => {
   const source = read("tab-toolbar-polish.js");
   assert.match(source, /data-active-tab=\\?"annotated\\?"[^}]*\.result-display-toggle\{display:none!important\}/);
