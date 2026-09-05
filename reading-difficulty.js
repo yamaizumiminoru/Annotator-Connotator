@@ -29,7 +29,6 @@
       ...(root.UI_TEXT.ja || {}),
       readingDifficultyType: "読解で詰まった",
       readingDifficultyAction: "📖 読みで詰まった",
-      readingDifficultyHint: "本文で詰まった箇所を選択して記録",
       readingDifficultySaved: "読解で詰まった箇所として記録しました。",
       readingDifficultyDuplicate: "この箇所はすでに記録されています。",
       readingDifficultyRemove: "記録を解除",
@@ -39,7 +38,6 @@
       ...(root.UI_TEXT.en || {}),
       readingDifficultyType: "Reading difficulty",
       readingDifficultyAction: "📖 Reading difficulty",
-      readingDifficultyHint: "Select a passage that interrupted your reading and record it",
       readingDifficultySaved: "Recorded as a reading difficulty.",
       readingDifficultyDuplicate: "This passage is already recorded.",
       readingDifficultyRemove: "Remove record",
@@ -62,7 +60,6 @@
       .reading-difficulty-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 12px}
       .reading-difficulty-action{border:1px solid rgba(42,112,150,.38);border-radius:999px;background:#eef7fc;color:#245b78;padding:7px 11px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
       .reading-difficulty-action:disabled{opacity:.45;cursor:default}
-      .reading-difficulty-hint{font-size:11px;color:var(--muted)}
       .hl-reading{background:#d9eef9!important;color:#245b78}
       .badge.reading{background:#d9eef9;color:#245b78}
       .reading-difficulty-remove{margin-top:12px;border:1px solid rgba(42,112,150,.35);border-radius:9px;background:transparent;color:#245b78;padding:8px 11px;font:inherit;font-weight:700;cursor:pointer}
@@ -279,11 +276,8 @@
     button.className = "reading-difficulty-action";
     button.disabled = true;
     button.textContent = text("readingDifficultyAction", "📖 読みで詰まった", "📖 Reading difficulty");
-    const hint = root.document.createElement("span");
-    hint.className = "reading-difficulty-hint";
-    hint.textContent = text("readingDifficultyHint", "本文で詰まった箇所を選択して記録", "Select a passage that interrupted your reading and record it");
     button.addEventListener("click", addMark);
-    row.append(button, hint);
+    row.append(button);
     annotated.insertAdjacentElement("beforebegin", row);
 
     root.document.addEventListener("selectionchange", () => {
@@ -294,7 +288,6 @@
     root.document.getElementById("uiLangSelect")?.addEventListener("change", () => {
       root.setTimeout(() => {
         button.textContent = text("readingDifficultyAction", "📖 読みで詰まった", "📖 Reading difficulty");
-        hint.textContent = text("readingDifficultyHint", "本文で詰まった箇所を選択して記録", "Select a passage that interrupted your reading and record it");
       }, 0);
     });
   }

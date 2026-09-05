@@ -11,18 +11,23 @@
       .tab-specific-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;flex-wrap:wrap;margin:0 0 12px}
       .tab-specific-toolbar[hidden]{display:none!important}
       .tab-specific-toolbar .annotation-filter-bar{flex:1 1 520px;margin:0;min-width:0}
-      .tab-specific-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px 10px;flex-wrap:wrap;margin-left:auto}
+      .tab-specific-actions{display:grid;grid-template-columns:max-content max-content;align-items:start;justify-content:end;gap:8px 10px;margin-left:auto}
       .tab-specific-actions[hidden]{display:none!important}
-      .tab-specific-toolbar .tts-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0}
+      .tab-specific-toolbar .tts-controls{display:grid;grid-template-columns:max-content max-content max-content max-content;align-items:center;gap:8px;margin:0}
+      .tab-specific-toolbar .tts-controls .tts-prompt-panel{grid-column:1/-1;width:100%;min-width:0}
       .tab-specific-toolbar .reading-difficulty-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0}
-      .tab-specific-toolbar .reading-difficulty-hint{max-width:220px;line-height:1.35}
       .tab-specific-toolbar[data-active-tab="annotated"] .result-display-toggle{display:none!important}
       .vocabulary-head.vocabulary-head-no-title{justify-content:flex-end}
       @media(max-width:900px){
         .tab-specific-toolbar{align-items:flex-start}
         .tab-specific-toolbar .annotation-filter-bar{flex-basis:100%}
-        .tab-specific-actions{width:100%;justify-content:flex-start;margin-left:0}
-        .tab-specific-toolbar .reading-difficulty-hint{max-width:none}
+        .tab-specific-actions{width:100%;grid-template-columns:1fr;justify-content:start;margin-left:0}
+        .tab-specific-toolbar .tts-controls{grid-template-columns:max-content max-content max-content max-content;justify-content:start}
+      }
+      @media(max-width:620px){
+        .tab-specific-toolbar .tts-controls{grid-template-columns:1fr 1fr}
+        .tab-specific-toolbar .tts-mode-wrap{grid-column:1/-1;flex-wrap:wrap}
+        .tab-specific-toolbar .tts-voice-select{grid-column:1/-1}
       }
     `;
     root.document.head.appendChild(style);

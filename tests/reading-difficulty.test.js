@@ -21,6 +21,12 @@ test("reading marks use a dedicated highlight and are excluded from the word lis
   assert.match(source, /renderWordList = function readingAwareRenderWordList/);
 });
 
+test("reading difficulty action stays compact without redundant instructional hint", () => {
+  assert.match(source, /row\.append\(button\)/);
+  assert.doesNotMatch(source, /readingDifficultyHint/);
+  assert.doesNotMatch(source, /reading-difficulty-hint/);
+});
+
 test("the selected source offsets and removal are persisted in the result", () => {
   assert.match(source, /start: selection\.start/);
   assert.match(source, /end: selection\.end/);
