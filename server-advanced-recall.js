@@ -12,11 +12,11 @@ function appendBlock(prompt, marker, lines) {
 
 function strengthenJudgePrompt(prompt) {
   return appendBlock(prompt, PATCH_MARKER, [
-    "- Preserve recall for genuinely advanced lexical targets. If a word or term has a genuinely C1-C2+ lexical burden in this context, advanced annotationValueByBand should normally be at least medium even when its meaning is literal rather than idiomatic.",
-    "- Preserve recall for domain terminology. A conventional domain term that is explicitly introduced, named, defined, contrasted, or needed to follow the source should normally have at least medium advanced-learner value when domainTermConfidence is not low. Do not downgrade it merely because it is foundational or familiar to specialists in that field.",
+    "- Preserve recall for genuinely advanced lexical targets. If a standalone word or term has a genuinely C1-C2+ lexical burden in this context and the lexical item itself is what the annotation teaches, primaryLearnerBand should normally be advanced; advanced annotationValueByBand should normally be at least medium even when its meaning is literal rather than idiomatic.",
+    "- Preserve recall for domain terminology. A conventional domain term that is explicitly introduced, named, defined, contrasted, or needed to follow the source should normally have at least medium advanced-learner value when domainTermConfidence is not low. Assign its primaryLearnerBand according to the level at which that term is pedagogically most appropriate in this context rather than promoting every domain term to advanced automatically.",
     "- Interpret naming, definition, and contrast cues in the source language as evidence of a useful domain concept. Such cues are supporting evidence, not a prerequisite for term eligibility.",
     "- Literalness is not a reason to discard a genuinely advanced standalone word. Rare, formal, academic, historical, or discipline-specific vocabulary can be useful precisely because the learner may not know the lexical item itself.",
-    "- These recall safeguards apply to standalone lexical/term targets, not to basic constructions, collocations, or formulas that merely contain an advanced word. Keep the earlier rule that incidental difficult slot vocabulary must not promote a simple multiword pattern.",
+    "- These recall safeguards apply to standalone lexical/term targets, not to basic constructions, collocations, or formulas that merely contain an advanced word. Keep the earlier rule that incidental difficult slot vocabulary must not promote a simple multiword pattern or its primaryLearnerBand.",
   ]);
 }
 
@@ -27,7 +27,7 @@ function strengthenDiscoveryPrompt(prompt) {
     "- A conventional name for a technical concept remains eligible when it includes a proper name. Distinguish concepts needed to understand the passage from incidental names of people or places, and judge their learning value independently of whether their component words are difficult.",
     "- Do not let a longer collocation, construction, or explanatory phrase crowd out a separately useful advanced word or domain term in the same passage. They teach different things and may both be candidates when the source supports them.",
     "- Apply the same lexical scan inside quotations, historical passages, examples, and parenthetical explanations; advanced vocabulary there is still a learning target.",
-    "- These additional lexical checks supplement discovery across all learner bands. Preserve useful beginner and intermediate words and expressions too; literalness alone is not a reason to exclude them. Do not pad with trivial material or promote lower-band targets to advanced; the contextual judge decides each band's learning value separately.",
+    "- These additional lexical checks supplement discovery across all learner bands. Preserve useful beginner and intermediate words and expressions too; literalness alone is not a reason to exclude them. Do not pad with trivial material or promote lower-band targets to advanced; the contextual judge assigns one primary learner band to each candidate.",
   ]);
 }
 
