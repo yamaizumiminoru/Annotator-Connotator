@@ -17,6 +17,7 @@ function candidate(id, text, overrides = {}) {
     priority: overrides.priority ?? 3,
     reliability: "high",
     judgeMeta: {
+      primaryLearnerBand: overrides.primary || "intermediate",
       componentLexicalBand: overrides.lexical || "intermediate",
       lexicalTriggerWords: overrides.triggers || [],
       contextualMeaningBand: overrides.contextual || "intermediate",
@@ -36,6 +37,7 @@ function candidate(id, text, overrides = {}) {
 
 test("derives multiple user-facing reasons without forcing exclusive categories", () => {
   const brain = candidate("a1", "brain plasticity", {
+    primary: "advanced",
     type: "term",
     lexical: "advanced",
     triggers: ["plasticity"],
@@ -47,28 +49,25 @@ test("derives multiple user-facing reasons without forcing exclusive categories"
   assert.deepEqual(reasonProfile(brain, ["advanced"]).tags, ["難語", "術語"]);
 });
 
-test("keeps extended senses for advanced learners while familiar discourse markers can fall away", () => {
+test("primary learner band prevents cross-level leakage even when another band has some value", () => {
   const stay = candidate("a1", "stay with you", {
+    primary: "intermediate",
     type: "formula",
     lexical: "beginner",
     contextual: "intermediate",
     meaningType: "metaphorical_or_extended_sense",
     values: { beginner: "medium", intermediate: "high", advanced: "medium" },
   });
-  const otherHand = candidate("a2", "on the other hand", {
-    type: "formula",
-    lexical: "beginner",
-    contextual: "intermediate",
-    meaningType: "discourse_marker",
-    values: { beginner: "medium", intermediate: "high", advanced: "medium" },
-  });
-  const standard = selectAnnotationsByDensity([stay, otherHand], 2, ["advanced"]);
-  assert.deepEqual(standard.map((item) => item.text), ["stay with you"]);
-  assert.deepEqual(standard[0].reasonTags, ["慣用表現"]);
+  const advanced = selectAnnotationsByDensity([stay], 3, ["advanced"]);
+  const intermediate = selectAnnotationsByDensity([stay], 3, ["intermediate"]);
+  assert.deepEqual(advanced, []);
+  assert.deepEqual(intermediate.map((item) => item.text), ["stay with you"]);
+  assert.deepEqual(intermediate[0].reasonTags, ["慣用表現"]);
 });
 
 test("recognizes technical terms and reusable constructions as separate reasons", () => {
   const twoWord = candidate("a1", "two-word stage", {
+    primary: "advanced",
     type: "term",
     lexical: "beginner",
     contextual: "advanced",
@@ -77,6 +76,7 @@ test("recognizes technical terms and reusable constructions as separate reasons"
     values: { beginner: "low", intermediate: "medium", advanced: "high" },
   });
   const construction = candidate("a2", "misleading to think of A as B", {
+    primary: "advanced",
     type: "construction",
     lexical: "intermediate",
     contextual: "advanced",
@@ -96,6 +96,7 @@ test("display tags suppress reasons already conveyed by the primary annotation t
 
 test("prepared candidates retain reason codes while removing redundant visible tags", () => {
   const construction = candidate("a1", "would have been better if", {
+    primary: "advanced",
     type: "construction",
     contextual: "advanced",
     meaningType: "reusable_construction",
@@ -106,29 +107,34 @@ test("prepared candidates retain reason codes while removing redundant visible t
   assert.ok(prepared.selectionReasonCodes.includes("reusable-construction"));
 });
 
-test("density is a soft value threshold rather than a fixed 40/70/100 percent quota", () => {
+test("density is a soft value threshold inside one primary learner band rather than a fixed quota", () => {
   const candidates = [
     candidate("a1", "high idiom", {
+      primary: "advanced",
       type: "idiom",
       meaningType: "idiom",
       values: { beginner: "low", intermediate: "low", advanced: "high" },
     }),
     candidate("a2", "medium extended", {
+      primary: "advanced",
       type: "formula",
       meaningType: "metaphorical_or_extended_sense",
       values: { beginner: "low", intermediate: "low", advanced: "medium" },
     }),
     candidate("a3", "medium discourse", {
+      primary: "advanced",
       type: "formula",
       meaningType: "discourse_marker",
       values: { beginner: "low", intermediate: "high", advanced: "medium" },
     }),
     candidate("a4", "low compositional", {
+      primary: "advanced",
       type: "collocation",
       meaningType: "compositional_phrase",
       values: { beginner: "low", intermediate: "low", advanced: "low" },
     }),
     candidate("a5", "high lexical", {
+      primary: "advanced",
       type: "word",
       lexical: "advanced",
       meaningType: "literal_lexical",
@@ -147,17 +153,28 @@ test("density is a soft value threshold rather than a fixed 40/70/100 percent qu
   assert.notEqual(standard.length, Math.ceil(candidates.length * 0.7));
 });
 
-test("multiple checked learner bands use union-style pedagogical value", () => {
+test("multiple checked learner bands use the union of exclusive primary bands", () => {
   const beginnerOnly = candidate("a1", "basic target", {
+    primary: "beginner",
     lexical: "beginner",
-    values: { beginner: "high", intermediate: "low", advanced: "low" },
+    values: { beginner: "high", intermediate: "medium", advanced: "medium" },
   });
-  const advancedOnly = candidate("a2", "advanced target", {
+  const intermediateOnly = candidate("a2", "intermediate target", {
+    primary: "intermediate",
+    lexical: "intermediate",
+    values: { beginner: "medium", intermediate: "high", advanced: "medium" },
+  });
+  const advancedOnly = candidate("a3", "advanced target", {
+    primary: "advanced",
     lexical: "advanced",
-    values: { beginner: "low", intermediate: "low", advanced: "high" },
+    values: { beginner: "medium", intermediate: "medium", advanced: "high" },
   });
-  const selected = selectAnnotationsByDensity([beginnerOnly, advancedOnly], 2, ["beginner", "advanced"]);
-  assert.deepEqual(selected.map((item) => item.id), ["a1", "a2"]);
+  const selected = selectAnnotationsByDensity(
+    [beginnerOnly, intermediateOnly, advancedOnly],
+    2,
+    ["beginner", "advanced"],
+  );
+  assert.deepEqual(selected.map((item) => item.id), ["a1", "a3"]);
 });
 
 test("judge failure falls back to priority thresholds without percentage slicing", () => {
