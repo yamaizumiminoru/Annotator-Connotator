@@ -109,8 +109,6 @@ function installAdvancedRecallPatch() {
   reasonSelection.__advancedRecallPatched = true;
 }
 
-installAdvancedRecallPatch();
-
 module.exports = {
   DISCOVERY_MARKER,
   PATCH_MARKER,
