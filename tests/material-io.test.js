@@ -6,6 +6,7 @@ const {
   MATERIAL_FORMAT,
   MATERIAL_SCHEMA_VERSION,
   buildMaterialEnvelope,
+  materialResultFromFullResult,
   safeFilenameStem,
   unwrapMaterial,
   validateResult,
@@ -13,75 +14,107 @@ const {
 
 const root = path.join(__dirname, "..");
 
-function sampleResult() {
+function candidate(id, band) {
   return {
-    sourceText: "This is a test.",
-    sourceLanguage: "en",
-    explanationLanguage: "ja",
-    uiLanguage: "ja",
-    level: "intermediate",
-    translation: "これはテストです。",
-    annotations: [
-      {
-        id: "a1",
-        text: "a test",
-        type: "word",
-        meaningJa: "テスト",
-        noteJa: "",
-        example: "",
-        pattern: "",
-        coreRanges: [],
-        start: 8,
-        end: 14,
-      },
-    ],
-    connotations: [],
-    slashReading: [],
+    id,
+    text: id,
+    type: "word",
+    meaningJa: id,
+    noteJa: "",
+    example: "",
+    pattern: "",
+    coreRanges: [],
+    start: 0,
+    end: id.length,
+    judgeMeta: {
+      primaryLearnerBand: band,
+      componentLexicalBand: band,
+      contextualMeaningBand: band,
+      annotationValueByBand: { beginner: "low", intermediate: "low", advanced: "low" },
+      lexicalTriggerWords: [],
+      domainTerm: false,
+      domainTermConfidence: "high",
+      meaningType: "literal_lexical",
+      confidence: "high",
+      reason: "fixture",
+    },
   };
 }
 
-test("material envelope has a versioned reusable format", () => {
-  const result = sampleResult();
+function fullResult() {
+  const beginner = candidate("basic", "beginner");
+  const intermediate = candidate("middle", "intermediate");
+  const advanced = candidate("hard", "advanced");
+  return {
+    sourceText: "basic middle hard",
+    sourceLanguage: "en",
+    explanationLanguage: "ja",
+    uiLanguage: "ja",
+    level: "advanced",
+    levels: ["advanced"],
+    translation: "",
+    annotations: [advanced],
+    connotations: [],
+    slashReading: [],
+    _selection: {
+      version: 2,
+      candidates: [beginner, intermediate, advanced],
+    },
+    _api: { selectedLevels: ["advanced"] },
+  };
+}
+
+test("material envelope stores the complete candidate pool, not only displayed annotations", () => {
+  const result = fullResult();
   const envelope = buildMaterialEnvelope(
     result,
-    { includeTranslation: true, nuanceDetail: "3" },
-    "2026-08-30T00:00:00.000Z",
+    { levels: ["advanced"], density: "4" },
+    "2026-09-05T00:00:00.000Z",
   );
   assert.equal(envelope.format, MATERIAL_FORMAT);
-  assert.equal(envelope.schemaVersion, MATERIAL_SCHEMA_VERSION);
-  assert.equal(envelope.exportedAt, "2026-08-30T00:00:00.000Z");
-  assert.deepEqual(envelope.result, result);
-  assert.equal(envelope.settings.includeTranslation, true);
-  assert.notEqual(envelope.result, result, "saved result should be a JSON-safe clone");
+  assert.equal(envelope.schemaVersion, 2);
+  assert.equal(MATERIAL_SCHEMA_VERSION, 2);
+  assert.equal(envelope.exportedAt, "2026-09-05T00:00:00.000Z");
+  assert.deepEqual(envelope.result.annotations.map((item) => item.id), ["basic", "middle", "hard"]);
+  assert.deepEqual(envelope.result.annotations.map((item) => item.judgeMeta.primaryLearnerBand), ["beginner", "intermediate", "advanced"]);
+  assert.deepEqual(envelope.settings.levels, ["advanced"]);
+  assert.equal(Object.hasOwn(envelope.settings, "level"), false);
+  assert.equal(Object.hasOwn(envelope.result, "_selection"), false);
+  assert.equal(Object.hasOwn(envelope.result, "_api"), false);
 });
 
-test("material loader accepts the versioned envelope", () => {
-  const result = sampleResult();
-  const envelope = buildMaterialEnvelope(result, { level: "intermediate" });
+test("material result conversion requires a full candidate pool", () => {
+  assert.throws(
+    () => materialResultFromFullResult({ ...fullResult(), _selection: undefined }),
+    /missing_candidate_pool/,
+  );
+});
+
+test("current material loader accepts schema 2", () => {
+  const envelope = buildMaterialEnvelope(fullResult(), { levels: ["beginner", "advanced"] });
   const loaded = unwrapMaterial(envelope);
-  assert.equal(loaded.legacy, false);
-  assert.equal(loaded.schemaVersion, 1);
-  assert.deepEqual(loaded.result, result);
+  assert.equal(loaded.schemaVersion, 2);
+  assert.deepEqual(loaded.settings.levels, ["beginner", "advanced"]);
   assert.equal(validateResult(loaded.result), true);
 });
 
-test("material loader accepts legacy raw result JSON", () => {
-  const result = sampleResult();
-  const loaded = unwrapMaterial(result);
-  assert.equal(loaded.legacy, true);
-  assert.equal(loaded.schemaVersion, 0);
-  assert.deepEqual(loaded.result, result);
+test("old schema 1 and raw result JSON are intentionally rejected", () => {
+  const current = buildMaterialEnvelope(fullResult(), { levels: ["intermediate"] });
+  assert.throws(
+    () => unwrapMaterial({ ...current, schemaVersion: 1 }),
+    /unsupported_schema/,
+  );
+  assert.throws(
+    () => unwrapMaterial(current.result),
+    /unsupported_schema/,
+  );
 });
 
-test("material loader rejects a newer unsupported schema", () => {
-  assert.throws(
-    () => unwrapMaterial({
-      format: MATERIAL_FORMAT,
-      schemaVersion: MATERIAL_SCHEMA_VERSION + 1,
-      result: sampleResult(),
-    }),
-    /newer_schema/,
-  );
+test("material validation requires a primary learner band on every saved candidate", () => {
+  const result = materialResultFromFullResult(fullResult(), { levels: ["intermediate"] });
+  assert.equal(validateResult(result), true);
+  delete result.annotations[1].judgeMeta.primaryLearnerBand;
+  assert.equal(validateResult(result), false);
 });
 
 test("material filename is safe and based on the first line", () => {
