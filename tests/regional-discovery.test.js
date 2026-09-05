@@ -76,12 +76,12 @@ test("flattens region-local offsets in source order and accepts an empty region"
   }];
 
   const flattened = flattenRegionalAnnotations(source, regions, modelRegions);
-  assert.deepEqual(flattened.annotations.map((item) => item.text), ["Opening target", "Final phrase"]);
-  assert.deepEqual(flattened.annotations.map((item) => item.start), [0, 30]);
-  assert.deepEqual(flattened.telemetry.regions.map((item) => item.candidateCount), [1, 0, 1]);
+  assert.deepEqual(flattened.annotations.map((item) => item.text), ["Opening target", "target", "Final phrase"]);
+  assert.deepEqual(flattened.annotations.map((item) => item.start), [0, 8, 30]);
+  assert.deepEqual(flattened.telemetry.regions.map((item) => item.candidateCount), [2, 0, 1]);
   assert.equal(flattened.telemetry.rawCandidateCount, 3);
-  assert.equal(flattened.telemetry.candidateCount, 2);
-  assert.equal(flattened.telemetry.droppedCandidateCount, 1);
+  assert.equal(flattened.telemetry.candidateCount, 3);
+  assert.equal(flattened.telemetry.droppedCandidateCount, 0);
 });
 
 test("long-form merge preserves regional discovery telemetry with global boundaries", () => {

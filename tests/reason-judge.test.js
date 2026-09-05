@@ -7,6 +7,7 @@ const {
   buildJudgePrompt,
   contextForCandidate,
 } = require("../lib/reason-judge");
+const { selectAnnotationsByDensity } = require("../lib/reason-selection");
 
 test("judge prompt explicitly decomposes lexical, target, domain, and per-band value", () => {
   const prompt = buildJudgePrompt();
@@ -54,7 +55,7 @@ test("broad discovery prompt removes the hard learner floor but protects connota
 test("applies judgments without changing spans and hides redundant display reasons", () => {
   const annotations = [{ id: "a1", text: "brain plasticity", type: "term", start: 10, end: 26, priority: 3 }];
   const judgments = [{
-    id: "a1",
+    id: buildJudgeItems("", annotations)[0].id,
     componentLexicalBand: "advanced",
     lexicalTriggerWords: ["plasticity"],
     contextualMeaningBand: "advanced",
@@ -71,6 +72,75 @@ test("applies judgments without changing spans and hides redundant display reaso
   assert.deepEqual(applied[0].reasonTags, ["難語"]);
   assert.ok(applied[0].selectionReasonCodes.includes("technical-term"));
   assert.equal(applied[0].priority, 5);
+});
+
+test("shuffled judgments stay with their targets despite duplicate, missing, or mixed model IDs", () => {
+  const bands = ["beginner", "intermediate", "advanced"];
+  const words = ["livre", "見直す", "Entropie"];
+  const source = words.join(". ");
+  for (const ids of [
+    ["a1", "a1", "a1"],
+    [undefined, undefined, undefined],
+    ["a2", undefined, "judge-1"],
+  ]) {
+    const annotations = words.map((text, index) => ({
+      ...(ids[index] ? { id: ids[index] } : {}),
+      text,
+      type: "word",
+      start: source.indexOf(text),
+      end: source.indexOf(text) + text.length,
+      priority: 3,
+    }));
+    const items = buildJudgeItems(source, annotations);
+    assert.equal(new Set(items.map((item) => item.id)).size, annotations.length);
+    const judgments = [2, 0, 1].map((index) => ({
+      id: items[index].id,
+      componentLexicalBand: bands[index],
+      contextualMeaningBand: bands[index],
+      annotationValueByBand: Object.fromEntries(bands.map((band) => [
+        band, band === bands[index] ? "high" : "low",
+      ])),
+      meaningType: "literal_lexical",
+      confidence: "high",
+      reason: words[index],
+    }));
+
+    const applied = applyJudgments(annotations, judgments, bands);
+    assert.deepEqual(applied.map((item) => item.judgeMeta.reason), words);
+    assert.deepEqual(applied.map((item) => [item.start, item.end]), annotations.map((item) => [item.start, item.end]));
+    assert.equal(new Set(applied.map((item) => item.id)).size, annotations.length);
+    for (const [index, id] of ids.entries()) {
+      if (id && ids.indexOf(id) === index) assert.equal(applied[index].id, id);
+    }
+    assert.deepEqual(applyJudgments(annotations, judgments, bands), applied);
+    for (const [index, band] of bands.entries()) {
+      assert.deepEqual(selectAnnotationsByDensity(applied, 3, [band]).map((item) => item.text), [words[index]]);
+    }
+  }
+});
+
+test("a missing judgment preserves candidate metadata even when its model ID matches another transport ID", () => {
+  const annotations = [
+    { id: "shared", text: "first", type: "word", start: 0, end: 5, priority: 2 },
+    { id: "judge-1", text: "second", type: "word", start: 6, end: 12, priority: 4 },
+    { text: "third", type: "word", start: 13, end: 18, priority: 3 },
+  ];
+  const items = buildJudgeItems("first second third", annotations);
+  const applied = applyJudgments(annotations, [{
+    id: items[0].id,
+    componentLexicalBand: "advanced",
+    contextualMeaningBand: "advanced",
+    annotationValueByBand: { beginner: "low", intermediate: "low", advanced: "high" },
+    meaningType: "literal_lexical",
+    confidence: "high",
+    reason: "First candidate only.",
+  }], ["advanced"]);
+
+  assert.equal(applied[0].judgeMeta.reason, "First candidate only.");
+  assert.strictEqual(applied[1], annotations[1]);
+  const { id, ...unchanged } = applied[2];
+  assert.ok(id);
+  assert.deepEqual(unchanged, annotations[2]);
 });
 
 test("judge items expose the intended teaching target, not only the surface span", () => {

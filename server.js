@@ -439,7 +439,7 @@ function buildAnnotationPrompt(payload) {
     "- For a reusable construction inside a longer annotation span, set pattern to its generalized frame and coreRanges to the non-overlapping JavaScript offsets within annotation text that mark the structural core. Use an empty pattern and empty coreRanges when no such display is useful.",
     "- Do not annotate an elementary pronoun, article, simple copula, punctuation mark, or isolated function word unless it is genuinely difficult at the target level or participates in a larger construction worth explaining.",
     "- Prefer the complete reusable phrase or construction over a trivial single word contained inside it.",
-    "- Do not annotate overlapping spans.",
+    "- Overlapping ordinary candidates are allowed when they teach different lexical items, senses, terms, or constructions. Preserve each independently for the contextual judge; do not repeat the same teaching target merely to increase the count.",
     "- Connotations may overlap ordinary annotations.",
     "- For each connotation, text/start/end identify the smallest contiguous wording that gives the learner a useful place to focus. Treat this as a UI highlight anchor, not as a context window or a claim that the nuance is encoded by that substring alone.",
     "- Each connotation card must have one primary learner-facing anchor. If a word or short phrase supplies the evaluative, register, stance, presuppositional, euphemistic, polite, or ironic cue, highlight that word or phrase even when the complete interpretation is constructed by later context, contrast, cancellation, or clarification.",

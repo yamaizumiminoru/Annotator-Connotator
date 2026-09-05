@@ -59,7 +59,7 @@ selection.wholePassageSelectionRules = function broadWholePassageSelectionRules(
   ];
   if (intensiveMode.isIntensive(requestContext.getStore()?.extractionMode)) {
     rules.push(
-      "This request uses intensive close-reading mode. Discover substantially more medium-value teachable candidates than normal mode while preserving the no-overlap rule.",
+      "This request uses intensive close-reading mode. Discover substantially more medium-value teachable candidates than normal mode, preserving overlapping candidates when they teach different things.",
     );
   }
   return rules;
