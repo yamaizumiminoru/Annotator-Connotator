@@ -27,10 +27,59 @@ test("invalid nuance ranges are ignored", () => {
   assert.deepEqual(overlapPopup.findCoveringNuances(connotations, 2, 4, 20), []);
 });
 
+test("ordinary annotation can be recovered for a nuance-only rendered span", () => {
+  const source = "Needless to say, honestly, this matters.";
+  const constructionStart = source.indexOf("Needless to say");
+  const formulaStart = source.indexOf("honestly");
+  const annotations = [
+    {
+      id: "construction",
+      text: "Needless to say",
+      type: "construction",
+      start: constructionStart,
+      end: constructionStart + "Needless to say".length,
+    },
+    {
+      id: "formula",
+      text: "honestly",
+      type: "formula",
+      start: formulaStart,
+      end: formulaStart + "honestly".length,
+    },
+  ];
+
+  assert.equal(
+    overlapPopup.findCoveringAnnotation(
+      annotations,
+      constructionStart,
+      constructionStart + "Needless to say".length,
+      source,
+    )?.item.id,
+    "construction",
+  );
+  assert.equal(
+    overlapPopup.findCoveringAnnotation(
+      annotations,
+      formulaStart,
+      formulaStart + "honestly".length,
+      source,
+    )?.item.id,
+    "formula",
+  );
+});
+
+test("nuance-only visuals are upgraded to category background plus nuance underline", () => {
+  const source = fs.readFileSync(path.join(root, "overlap-popup-polish.js"), "utf8");
+  assert.match(source, /querySelectorAll\("\.nuance-only"\)/);
+  assert.match(source, /classList\.remove\("nuance-only"\)/);
+  assert.match(source, /classList\.add\("hl", `hl-\$\{annotationSpan\.item\.type\}`, "nuance-overlap"\)/);
+  assert.match(source, /patchRenderer\(root, container\)/);
+});
+
 test("overlap popup polish intercepts the underlined overlap and opens annotation plus nuance", () => {
   const source = fs.readFileSync(path.join(root, "overlap-popup-polish.js"), "utf8");
   assert.match(source, /closest\?\.\("\.nuance-overlap"\)/);
-  assert.match(source, /buildHighlightSpans\(result\.sourceText, result\.annotations \|\| \[\]\)/);
+  assert.match(source, /findCoveringAnnotation\(result\.annotations, range\.start, range\.end, source\)/);
   assert.match(source, /openPopup\(annotationSpan\.item\.id\)/);
   assert.match(source, /popupNuances\.replaceChildren\(renderNuanceBlock\(nuances\)\)/);
   assert.match(source, /stopImmediatePropagation\(\)/);
