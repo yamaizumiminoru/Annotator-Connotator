@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const {
   buildCoverageCompletionPrompt,
   candidateDiscoveryTarget,
+  contextualLevelSelectionRules,
   findLaterCoverageReview,
   mergeUniqueNonOverlappingAnnotations,
   selectAnnotationsByDensity,
@@ -155,7 +156,21 @@ test("later completion candidates are globally ranked before density selection",
   ) === text));
 });
 
-test("completion guidance preserves the difficulty floor and permits an empty result", () => {
+test("learner level is calibrated on contextual expression sense rather than component words", () => {
+  const rules = contextualLevelSelectionRules().join("\n");
+
+  assert.match(rules, /beginner = A1-A2/);
+  assert.match(rules, /intermediate = B1-B2/);
+  assert.match(rules, /advanced = C1-C2 and above/);
+  assert.match(rules, /contextual expression or sense as one learning unit/);
+  assert.match(rules, /not to the difficulty of its component words/);
+  assert.match(rules, /Basic words can form intermediate or advanced idioms/);
+  assert.match(rules, /high frequency, broad reusability/);
+  assert.match(rules, /lowest useful learner band is lower/);
+  assert.match(rules, /recognized domain term/);
+});
+
+test("completion guidance preserves the difficulty floor and contextual-sense calibration", () => {
   const globalRules = wholePassageSelectionRules(12).join("\n");
   const completionPrompt = buildCoverageCompletionPrompt({
     sourceLanguage: "English",
@@ -167,8 +182,11 @@ test("completion guidance preserves the difficulty floor and permits an empty re
 
   assert.match(globalRules, /entire source text from beginning to end/);
   assert.match(globalRules, /global candidate set/);
+  assert.match(globalRules, /contextual expression or sense/);
   assert.match(globalRules, /never pad/i);
   assert.match(completionPrompt, /exactly the same learner-level knowledge floor/);
+  assert.match(completionPrompt, /contextual expression or sense/);
+  assert.match(completionPrompt, /component words/);
   assert.match(completionPrompt, /empty annotations array/);
   assert.match(completionPrompt, /Connotation coverage is intentionally not being completed/);
 });
